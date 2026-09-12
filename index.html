@@ -338,6 +338,11 @@ function avgRating(ratings){
   if(!vals.length) return null;
   return vals.reduce(function(a,b){return a+b;},0)/vals.length;
 }
+function getCategories(p){
+  if(p.categories && p.categories.length) return p.categories;
+  if(p.category) return [p.category];
+  return [];
+}
 function friendlyAuthError(err){
   var code = err && err.code || "";
   var map = {
@@ -646,9 +651,9 @@ function filteredPlaces(status){
   var q = (S.search||"").toLowerCase().trim();
   return S.places.filter(function(p){
     if((p.status||"want")!==status) return false;
-    if(S.categoryFilter && p.category!==S.categoryFilter) return false;
+    if(S.categoryFilter && getCategories(p).indexOf(S.categoryFilter)===-1) return false;
     if(q){
-      var hay = [p.name,p.notes,p.category,(p.tags||[]).join(" ")].join(" ").toLowerCase();
+      var hay = [p.name,p.notes].concat(getCategories(p)).concat(p.tags||[]).join(" ").toLowerCase();
       if(hay.indexOf(q)===-1) return false;
     }
     return true;
@@ -666,7 +671,8 @@ function placeCardHtml(p){
   var avg = avgRating(p.ratings);
   var priceStr = p.price ? Array(p.price+1).join("$") : "";
   var metaBits = [];
-  if(p.category) metaBits.push(escapeHtml(p.category));
+  var placeCats = getCategories(p);
+  if(placeCats.length) metaBits.push(escapeHtml(placeCats.join(", ")));
   if(p.address) metaBits.push(escapeHtml(p.address));
   if(p.website){
     var fav = faviconUrl(p.website);
@@ -724,7 +730,10 @@ function wantTabHtml(){
   if(!list.length) return emptyStateHtml("want");
   if(S.categoryFilter) return list.sort(function(a,b){return a.name.localeCompare(b.name);}).map(placeCardHtml).join("");
   var byCat = {};
-  list.forEach(function(p){ var c=p.category||"Uncategorized"; (byCat[c]=byCat[c]||[]).push(p); });
+  list.forEach(function(p){
+    var cs = getCategories(p); if(!cs.length) cs=["Uncategorized"];
+    cs.forEach(function(c){ (byCat[c]=byCat[c]||[]).push(p); });
+  });
   return Object.keys(byCat).sort().map(function(c){
     var items = byCat[c].sort(function(a,b){return a.name.localeCompare(b.name);});
     return '<div class="category-group"><div class="category-title">'+escapeHtml(c)+' <span class="count">'+items.length+'</span></div>'+items.map(placeCardHtml).join("")+'</div>';
@@ -740,7 +749,7 @@ function shuffleTabHtml(){
   if(S.shuffleResult){
     var p = S.shuffleResult; var avg = avgRating(p.ratings);
     html += '<div class="shuffle-card"><div class="fork">'+(S.shuffleMode==="new"?"🎲":"⭐")+'</div>'+
-      '<h3 class="display">'+escapeHtml(p.name)+'</h3><div class="cat">'+escapeHtml(p.category||"")+(p.address?" · "+escapeHtml(p.address):"")+'</div>'+
+      '<h3 class="display">'+escapeHtml(p.name)+'</h3><div class="cat">'+escapeHtml(getCategories(p).join(", "))+(p.address?" · "+escapeHtml(p.address):"")+'</div>'+
       (avg!=null?('<div class="rating-line" style="justify-content:center;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b></div>'):"")+
       '<div style="display:flex;gap:10px;margin-top:16px;"><button class="btn btn-secondary btn-block" id="shuffle-view">View details</button>'+
       '<button class="btn btn-primary btn-block" id="shuffle-again">Shuffle again</button></div></div>';
@@ -780,7 +789,7 @@ function tabbarHtml(){
 
 /* ---------------- Sheet ---------------- */
 function blankPlace(status, category){
-  return { id: uid(), name:"", category: category || (S.space.categories||[])[0]||"", status: status||"want", address:"", website:"",
+  return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", website:"",
     price:0, notes:"", tags:[], photos:[], ratings:{}, visitDate:"", wouldReturn:null, addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function normalizeUrl(u){
@@ -799,11 +808,12 @@ function editSheetHtml(p){
   html += '<div class="segment" style="margin-bottom:16px;"><button class="'+(p.status==="want"?"active":"")+'" data-set-status="want">Want to go</button>'+
     '<button class="'+(p.status==="been"?"active":"")+'" data-set-status="been">Been there</button></div>';
   html += '<div class="field"><label for="f-name">Name</label><input type="text" id="f-name" value="'+escapeHtml(p.name)+'" placeholder="e.g. El Camion"></div>';
+  var placeCats = getCategories(p);
   var catOptions = cats.slice();
-  if(p.category && catOptions.indexOf(p.category)===-1) catOptions.unshift(p.category);
-  html += '<div class="field"><label for="f-category">Category</label><div class="cat-row"><select id="f-category">'+
-    catOptions.map(function(c){ return '<option value="'+escapeHtml(c)+'"'+(c===p.category?" selected":"")+'>'+escapeHtml(c)+'</option>'; }).join("")+
-    '<option value="__new__">+ New category…</option></select></div></div>';
+  placeCats.forEach(function(c){ if(catOptions.indexOf(c)===-1) catOptions.unshift(c); });
+  html += '<div class="field"><label>Categories <span style="text-transform:none;font-weight:400;">(pick as many as fit)</span></label><div class="chips-edit">'+
+    catOptions.map(function(c){ return '<button type="button" class="chip'+(placeCats.indexOf(c)>-1?" active":"")+'" data-cat-toggle="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; }).join("")+
+    '</div><div class="tag-input-row" style="margin-top:8px;"><input type="text" id="f-new-cat" placeholder="Add a new category"><button type="button" class="btn btn-secondary btn-sm" id="f-cat-add">Add</button></div></div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
@@ -920,11 +930,13 @@ function bindShell(){
       var i = +inp.getAttribute("data-cat-edit");
       var cats = (S.space.categories||[]).slice();
       var oldName = cats[i];
-      cats[i] = inp.value.trim() || oldName;
+      var newName = inp.value.trim() || oldName;
+      cats[i] = newName;
       store.updateSpace(S.spaceCode, {categories: cats});
-      if(cats[i]!==oldName){
-        S.places.filter(function(p){return p.category===oldName;}).forEach(function(p){
-          var data = Object.assign({}, p, {category: cats[i]}); delete data.id;
+      if(newName!==oldName){
+        S.places.filter(function(p){return getCategories(p).indexOf(oldName)>-1;}).forEach(function(p){
+          var newCats = getCategories(p).map(function(c){ return c===oldName ? newName : c; });
+          var data = Object.assign({}, p, {categories: newCats}); delete data.category; delete data.id;
           store.savePlace(S.spaceCode, p.id, data);
         });
       }
@@ -951,7 +963,7 @@ function bindShell(){
 
 function runShuffle(){
   var pool = S.places.filter(function(p){
-    if(S.shuffleCategory && p.category!==S.shuffleCategory) return false;
+    if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
     if(S.shuffleMode==="new") return (p.status||"want")==="want";
     if((p.status||"want")!=="been") return false;
     var avg = avgRating(p.ratings);
@@ -959,7 +971,7 @@ function runShuffle(){
   });
   if(!pool.length){
     pool = S.places.filter(function(p){
-      if(S.shuffleCategory && p.category!==S.shuffleCategory) return false;
+      if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
       return S.shuffleMode==="new" ? (p.status||"want")==="want" : (p.status||"want")==="been";
     });
   }
@@ -992,17 +1004,27 @@ function bindSheet(){
       syncSheetFieldsIntoPlace(place); render();
     };
   });
-  if((el=document.getElementById("f-category"))){
-    el.onchange = function(){
-      if(this.value==="__new__"){
-        var v = prompt("New category name");
-        if(v && v.trim()){
-          var cats = (S.space.categories||[]).slice(); cats.push(v.trim());
-          store.updateSpace(S.spaceCode, {categories:cats});
-          place.category = v.trim();
-        }
-        syncSheetFieldsIntoPlace(place); render();
-      } else { place.category = this.value; }
+  document.querySelectorAll("[data-cat-toggle]").forEach(function(b){
+    b.onclick = function(){
+      var c = b.getAttribute("data-cat-toggle");
+      var cats = getCategories(place).slice();
+      var idx = cats.indexOf(c);
+      if(idx>-1) cats.splice(idx,1); else cats.push(c);
+      place.categories = cats; delete place.category;
+      syncSheetFieldsIntoPlace(place); render();
+    };
+  });
+  if((el=document.getElementById("f-cat-add"))){
+    el.onclick = function(){
+      var inp = document.getElementById("f-new-cat");
+      var v = inp.value.trim(); if(!v) return;
+      var spaceCats = (S.space.categories||[]).slice();
+      if(spaceCats.indexOf(v)===-1){ spaceCats.push(v); store.updateSpace(S.spaceCode, {categories: spaceCats}); }
+      var cats = getCategories(place).slice();
+      if(cats.indexOf(v)===-1) cats.push(v);
+      place.categories = cats; delete place.category;
+      inp.value = "";
+      syncSheetFieldsIntoPlace(place); render();
     };
   }
   if((el=document.getElementById("website-search-btn"))){
