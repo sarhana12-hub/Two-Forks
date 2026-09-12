@@ -446,9 +446,15 @@ function render(){
     app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">🍴</div><p style="color:var(--ink-soft);">Loading your list…</p></div></div></div>';
     return;
   }
+  var prevSheetBody = document.querySelector(".sheet-body");
+  var sheetScroll = prevSheetBody ? prevSheetBody.scrollTop : null;
   app.innerHTML = shellHtml();
   bindShell();
   document.body.style.overflow = S.sheet ? "hidden" : "";
+  if(sheetScroll!=null){
+    var nextSheetBody = document.querySelector(".sheet-body");
+    if(nextSheetBody) nextSheetBody.scrollTop = sheetScroll;
+  }
 }
 
 /* ---------------- Auth screens ---------------- */
@@ -593,6 +599,7 @@ function iconBack(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fil
 function iconClose(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'; }
 function iconPlus(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'; }
 function iconCheck(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; }
+function iconCheckboxQuestion(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 2.5-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'; }
 function iconBookmark(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/></svg>'; }
 function iconDice(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>'; }
 function iconGear(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09A1.7 1.7 0 008.6 19a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.24 15a1.7 1.7 0 00-1.55-1H2.6a2 2 0 110-4h.09A1.7 1.7 0 004.24 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 008.6 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.76 9c.1.4.5 1.55 1.55 1.55H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></svg>'; }
@@ -679,7 +686,7 @@ function placeCardHtml(p){
   }
   if((p.status||"want")==="want" && p.notes) html += '<div class="per-person" style="margin-top:6px;">🍴 '+escapeHtml(p.notes)+'</div>';
   if(p.tags && p.tags.length) html += '<div class="tag-row">'+p.tags.map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+'</div>';
-  if((p.status||"want")==="want") html += '<div class="want-actions"><button class="btn btn-secondary btn-sm" data-mark-been="'+p.id+'">'+iconCheck()+' Been there</button></div>';
+  if((p.status||"want")==="want") html += '<div class="want-actions"><button class="btn btn-secondary btn-sm" data-mark-been="'+p.id+'">'+iconCheckboxQuestion()+' Been here?</button></div>';
   html += '</div></div>';
   return html;
 }
