@@ -690,8 +690,15 @@ function placeCardHtml(p){
   html += '</div></div>';
   return html;
 }
+function categoryEmoji(cat){
+  var map = {
+    "tacos":"🌮", "pizza":"🍕", "coffee":"☕", "brunch":"🥞", "burgers":"🍔",
+    "ramen":"🍜", "ice cream":"🍨", "bars & drinks":"🍸"
+  };
+  return map[(cat||"").trim().toLowerCase()] || "🍽️";
+}
 function emptyStateHtml(kind){
-  var emoji = kind==="been" ? "🌮" : "📍";
+  var emoji = S.categoryFilter ? categoryEmoji(S.categoryFilter) : (kind==="been" ? "🌮" : "📍");
   if(S.search){
     return '<div class="empty"><span class="fork">'+emoji+'</span><p>Nothing matches “'+escapeHtml(S.search)+'”'+(S.categoryFilter?' in '+escapeHtml(S.categoryFilter):'')+'. Try a different search, or tap + to add it.</p></div>';
   }
