@@ -701,7 +701,12 @@ function categoryEmoji(cat){
   };
   return map[(cat||"").trim().toLowerCase()] || "🍽️";
 }
-function isDrinkCategory(name){ return (name||"").toLowerCase().indexOf("drink")>-1; }
+var DRINK_CATEGORIES = ["coffee","bars & drinks","tea","wine","cocktails"];
+function isDrinkCategory(name){
+  var n = (name||"").trim().toLowerCase();
+  if(DRINK_CATEGORIES.indexOf(n)>-1) return true;
+  return n.indexOf("drink")>-1;
+}
 function sortCategories(cats){
   return (cats||[]).slice().sort(function(a,b){
     var da = isDrinkCategory(a)?1:0, db = isDrinkCategory(b)?1:0;
