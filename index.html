@@ -313,6 +313,11 @@ function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, function
 function avatarColor(name){ var h=0; name=name||"?"; for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i))>>>0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
 function initials(name){ name=(name||"?").trim(); if(!name) return "?"; var parts=name.split(/\s+/); return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase(); }
 function mapsUrl(name,address){ var q=[name,address].filter(Boolean).join(" "); return "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q); }
+function webSearchUrl(name,address){ var q=[name,address,"menu"].filter(Boolean).join(" "); return "https://www.google.com/search?q="+encodeURIComponent(q); }
+function faviconUrl(website){
+  try{ var host = new URL(website).hostname; return "https://www.google.com/s2/favicons?domain="+encodeURIComponent(host)+"&sz=32"; }
+  catch(e){ return null; }
+}
 
 function starSvg(fill){
   var gid = "g"+Math.random().toString(36).slice(2,8);
@@ -659,7 +664,11 @@ function placeCardHtml(p){
   var metaBits = [];
   if(p.category) metaBits.push(escapeHtml(p.category));
   if(p.address) metaBits.push(escapeHtml(p.address));
-  if(p.website) metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener">Menu ↗</a>');
+  if(p.website){
+    var fav = faviconUrl(p.website);
+    metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;">'+
+      (fav?'<img src="'+fav+'" alt="" width="14" height="14" style="border-radius:3px;">':'')+'Menu ↗</a>');
+  }
   var html = '<div class="place-card" data-id="'+p.id+'">';
   html += '<div class="place-thumb">'+thumb+'</div><div class="place-main">';
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
@@ -787,7 +796,9 @@ function editSheetHtml(p){
     '<option value="__new__">+ New category…</option></select></div></div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
-  html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…"></div>';
+  html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
+    '<div class="tag-input-row"><input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="website-search-btn">Search</button></div></div>';
   if(p.status==="been"){
     html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
     html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
@@ -965,6 +976,14 @@ function bindSheet(){
         }
         syncSheetFieldsIntoPlace(place); render();
       } else { place.category = this.value; }
+    };
+  }
+  if((el=document.getElementById("website-search-btn"))){
+    el.onclick = function(){
+      var name = (document.getElementById("f-name")||{}).value || place.name || "";
+      var addr = (document.getElementById("f-address")||{}).value || place.address || "";
+      if(!name.trim()){ showToast("Add a name first"); return; }
+      window.open(webSearchUrl(name, addr), "_blank", "noopener");
     };
   }
   if((el=document.getElementById("f-tag-add"))){
