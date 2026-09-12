@@ -465,7 +465,7 @@ function googleIcon(){
 function bindAuth(){
   var el;
   if((el=document.getElementById("google-btn"))) el.onclick = function(){
-    var btn = el;
+    var btn = this;
     var provider = new GoogleAuthProvider();
     var popupPromise = signInWithPopup(auth, provider);
     btn.disabled = true; btn.textContent = "Signing in…";
@@ -499,7 +499,7 @@ function nameHtml(){
 }
 function bindName(){
   var el;
-  if((el=document.getElementById("name-input"))) setTimeout(function(){ el.focus(); },0);
+  if((el=document.getElementById("name-input"))){ var nameInputEl = el; setTimeout(function(){ nameInputEl.focus(); },0); }
   if((el=document.getElementById("name-go"))) el.onclick = function(){
     var name = document.getElementById("name-input").value.trim();
     if(!name){ showToast("Enter a name to continue"); return; }
@@ -668,12 +668,24 @@ function placeCardHtml(p){
   html += '</div></div>';
   return html;
 }
+function emptyStateHtml(kind){
+  var emoji = kind==="been" ? "🌮" : "📍";
+  if(S.search){
+    return '<div class="empty"><span class="fork">'+emoji+'</span><p>Nothing matches “'+escapeHtml(S.search)+'”'+(S.categoryFilter?' in '+escapeHtml(S.categoryFilter):'')+'. Try a different search, or tap + to add it.</p></div>';
+  }
+  if(S.categoryFilter){
+    var verb = kind==="been" ? "logged" : "on your want-to-go list";
+    return '<div class="empty"><span class="fork">'+emoji+'</span><p>No '+escapeHtml(S.categoryFilter)+' spots '+verb+' yet. Tap + to add one, or pick "All" above to see everything else.</p></div>';
+  }
+  if(kind==="been") return '<div class="empty"><span class="fork">🌮</span><p>No places yet. Tap + to log the best taco spot in town.</p></div>';
+  return '<div class="empty"><span class="fork">📍</span><p>Nothing on your list to try yet. Add a place you have been wanting to check out.</p></div>';
+}
 function beenTabHtml(){
   var list = filteredPlaces("been");
   if(S.sortBeen==="top") list = list.slice().sort(function(a,b){ return (avgRating(b.ratings)||0)-(avgRating(a.ratings)||0); });
   else if(S.sortBeen==="recent") list = list.slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
   else list = list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
-  if(!list.length) return '<div class="empty"><span class="fork">🌮</span><p>No places yet. Tap + to log the best taco spot in town.</p></div>';
+  if(!list.length) return emptyStateHtml("been");
   var html = '<div class="chip-row" style="margin-bottom:6px;">'+["top","recent","name"].map(function(s){
     var label = {top:"Highest rated",recent:"Recently added",name:"Name A–Z"}[s];
     return '<button class="chip'+(S.sortBeen===s?" active":"")+'" data-sort="'+s+'">'+label+'</button>';
@@ -683,7 +695,7 @@ function beenTabHtml(){
 }
 function wantTabHtml(){
   var list = filteredPlaces("want");
-  if(!list.length) return '<div class="empty"><span class="fork">📍</span><p>Nothing on your list to try yet. Add a place you have been wanting to check out.</p></div>';
+  if(!list.length) return emptyStateHtml("want");
   if(S.categoryFilter) return list.sort(function(a,b){return a.name.localeCompare(b.name);}).map(placeCardHtml).join("");
   var byCat = {};
   list.forEach(function(p){ var c=p.category||"Uncategorized"; (byCat[c]=byCat[c]||[]).push(p); });
@@ -800,7 +812,7 @@ function bindShell(){
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
     el.oninput = function(){
-      var pos = el.selectionStart; S.search = el.value; render();
+      var pos = this.selectionStart; S.search = this.value; render();
       var el2 = document.getElementById("search-input");
       if(el2){ el2.focus(); try{ el2.setSelectionRange(pos,pos); }catch(e){} }
     };
@@ -924,7 +936,7 @@ function bindSheet(){
   });
   if((el=document.getElementById("f-category"))){
     el.onchange = function(){
-      if(el.value==="__new__"){
+      if(this.value==="__new__"){
         var v = prompt("New category name");
         if(v && v.trim()){
           var cats = (S.space.categories||[]).slice(); cats.push(v.trim());
@@ -932,7 +944,7 @@ function bindSheet(){
           place.category = v.trim();
         }
         syncSheetFieldsIntoPlace(place); render();
-      } else { place.category = el.value; }
+      } else { place.category = this.value; }
     };
   }
   if((el=document.getElementById("f-tag-add"))){
@@ -950,7 +962,7 @@ function bindSheet(){
   if((el=document.getElementById("photo-add-btn"))) el.onclick = function(){ document.getElementById("photo-file").click(); };
   if((el=document.getElementById("photo-file"))){
     el.onchange = function(){
-      var file = el.files && el.files[0]; if(!file) return;
+      var file = this.files && this.files[0]; if(!file) return;
       showToast("Adding photo…");
       fileToCompressedDataUrl(file, 640, 0.55).then(function(dataUrl){
         place.photos = (place.photos||[]).concat([dataUrl]);
