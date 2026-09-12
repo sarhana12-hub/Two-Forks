@@ -797,8 +797,11 @@ function editSheetHtml(p){
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
-    '<div class="tag-input-row"><input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
-    '<button type="button" class="btn btn-secondary btn-sm" id="website-search-btn">Search</button></div></div>';
+    '<input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
+    '<div style="display:flex;gap:8px;margin-top:8px;">'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="website-paste-btn" style="flex:1;">Paste</button>'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="website-search-btn" style="flex:1;">Search</button>'+
+    '</div></div>';
   if(p.status==="been"){
     html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
     html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
@@ -984,6 +987,19 @@ function bindSheet(){
       var addr = (document.getElementById("f-address")||{}).value || place.address || "";
       if(!name.trim()){ showToast("Add a name first"); return; }
       window.open(webSearchUrl(name, addr), "_blank", "noopener");
+    };
+  }
+  if((el=document.getElementById("website-paste-btn"))){
+    el.onclick = function(){
+      if(!(navigator.clipboard && navigator.clipboard.readText)){ showToast("Clipboard paste isn't supported here — paste manually"); return; }
+      navigator.clipboard.readText().then(function(text){
+        text = (text||"").trim();
+        if(!text){ showToast("Clipboard is empty"); return; }
+        syncSheetFieldsIntoPlace(place);
+        place.website = text;
+        render();
+        showToast("Pasted");
+      }).catch(function(){ showToast("Couldn't read clipboard — paste manually"); });
     };
   }
   if((el=document.getElementById("f-tag-add"))){
