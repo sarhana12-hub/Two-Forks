@@ -230,9 +230,6 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .photo-add{ width:72px; height:72px; border-radius:10px; border:1.5px dashed var(--border); background:none; color:var(--ink-faint);
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; cursor:pointer; }
 
-.others-ratings{ background:var(--surface-2); border-radius:12px; padding:12px 14px; margin-top:4px; }
-.others-ratings .row{ display:flex; justify-content:space-between; font-size:13.5px; padding:3px 0; }
-
 .confirm-box{ background:var(--chili-soft); border:1px solid var(--chili); border-radius:12px; padding:14px; margin-top:12px; }
 .confirm-box p{ margin:0 0 10px; font-size:13.5px; color:var(--ink); }
 .confirm-box .row{ display:flex; gap:8px; }
@@ -796,8 +793,7 @@ function sheetHtml(){ return S.sheet.type==="edit" ? editSheetHtml(S.sheet.place
 function editSheetHtml(p){
   var cats = S.space.categories||[];
   var isNew = !!p.isNew;
-  var myRating = (p.ratings && p.ratings[S.meUid]) || 0;
-  var others = Object.keys(p.ratings||{}).filter(function(k){return k!==S.meUid && p.ratings[k]>0;});
+  S.sheet.ratingFor = S.sheet.ratingFor || S.meUid;
   var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
   html += '<div class="sheet-header"><h2>'+(isNew?"Add a place":"Edit place")+'</h2><button class="icon-btn" id="sheet-close">'+iconClose()+'</button></div><div class="sheet-body">';
   html += '<div class="segment" style="margin-bottom:16px;"><button class="'+(p.status==="want"?"active":"")+'" data-set-status="want">Want to go</button>'+
@@ -823,11 +819,18 @@ function editSheetHtml(p){
   }
   if(p.status==="been"){
     html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
-    html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
-        var fill = myRating>=i ? "full" : (myRating>=i-0.5 ? "half" : "empty");
+    var ratingPeople = (S.space.people&&S.space.people.length) ? S.space.people : [{uid:S.meUid, name:S.me}];
+    var ratingForVal = (p.ratings && p.ratings[S.sheet.ratingFor]) || 0;
+    html += '<div class="field"><label>Rating</label>';
+    if(ratingPeople.length>1){
+      html += '<div class="segment" style="margin-bottom:10px;">'+ratingPeople.map(function(person){
+        return '<button class="'+(S.sheet.ratingFor===person.uid?"active":"")+'" data-rating-for="'+person.uid+'">'+escapeHtml(person.name)+'</button>';
+      }).join("")+'</div>';
+    }
+    html += '<div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
+        var fill = ratingForVal>=i ? "full" : (ratingForVal>=i-0.5 ? "half" : "empty");
         return '<button data-star="'+i+'">'+starSvg(fill)+'</button>';
       }).join("")+'</div></div>';
-    if(others.length) html += '<div class="others-ratings">'+others.map(function(k){ return '<div class="row"><span>'+escapeHtml(personName(k))+'</span>'+starsHtml(p.ratings[k])+'</div>'; }).join("")+'</div>';
     html += '<div class="field"><label for="f-date">Visit date</label><input type="date" id="f-date" value="'+escapeHtml(p.visitDate||"")+'"></div>';
     html += '<div class="field"><label>Would you go back?</label><div class="segment">'+["yes","unsure","no"].map(function(v){ return '<button class="'+(p.wouldReturn===v?"active":"")+'" data-return="'+v+'">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>'; }).join("")+'</div></div>';
   }
@@ -978,12 +981,14 @@ function bindSheet(){
   document.querySelectorAll("[data-set-status]").forEach(function(b){ b.onclick=function(){ place.status=b.getAttribute("data-set-status"); syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-price]").forEach(function(b){ b.onclick=function(){ var n=+b.getAttribute("data-price"); place.price = place.price===n?0:n; syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-return]").forEach(function(b){ b.onclick=function(){ place.wouldReturn=b.getAttribute("data-return"); syncSheetFieldsIntoPlace(place); render(); }; });
+  document.querySelectorAll("[data-rating-for]").forEach(function(b){ b.onclick=function(){ S.sheet.ratingFor=b.getAttribute("data-rating-for"); render(); }; });
   document.querySelectorAll("[data-star]").forEach(function(b){
     b.onclick = function(){
+      var forUid = S.sheet.ratingFor || S.meUid;
       var i = +b.getAttribute("data-star");
-      var cur = (place.ratings && place.ratings[S.meUid]) || 0;
+      var cur = (place.ratings && place.ratings[forUid]) || 0;
       var next = cur===i ? i-0.5 : (cur===i-0.5 ? 0 : i);
-      place.ratings = Object.assign({}, place.ratings); place.ratings[S.meUid] = next;
+      place.ratings = Object.assign({}, place.ratings); place.ratings[forUid] = next;
       syncSheetFieldsIntoPlace(place); render();
     };
   });
