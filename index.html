@@ -802,6 +802,11 @@ function editSheetHtml(p){
     '<button type="button" class="btn btn-secondary btn-sm" id="website-paste-btn" style="flex:1;">Paste</button>'+
     '<button type="button" class="btn btn-secondary btn-sm" id="website-search-btn" style="flex:1;">Search</button>'+
     '</div></div>';
+  if(p.website){
+    var siteFav = faviconUrl(p.website);
+    html += '<div style="margin:-8px 0 14px;"><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
+      (siteFav?'<img src="'+siteFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open website</a></div>';
+  }
   if(p.status==="been"){
     html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
     html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
