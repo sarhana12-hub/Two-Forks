@@ -859,7 +859,10 @@ function editSheetHtml(p){
   placeCats.forEach(function(c){ if(catOptions.indexOf(c)===-1) catOptions.unshift(c); });
   html += '<div class="field"><label>Categories <span style="text-transform:none;font-weight:400;">(pick as many as fit)</span></label><div class="chips-edit">'+
     catOptions.map(function(c){ return '<button type="button" class="chip'+(placeCats.indexOf(c)>-1?" active":"")+'" data-cat-toggle="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; }).join("")+
-    '</div><div class="tag-input-row" style="margin-top:8px;"><input type="text" id="f-new-cat" placeholder="Add a new category"><button type="button" class="btn btn-secondary btn-sm" id="f-cat-add">Add</button></div></div>';
+    (S.sheet.addingCategory ? '' : '<button type="button" class="chip" id="cat-add-chip" aria-label="Add a category">+</button>')+
+    '</div>'+
+    (S.sheet.addingCategory ? '<div class="tag-input-row" style="margin-top:8px;"><input type="text" id="f-new-cat" placeholder="New category"><button type="button" class="btn btn-secondary btn-sm" id="f-cat-add">Add</button></div>' : '')+
+    '</div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
@@ -1095,6 +1098,17 @@ function bindSheet(){
       syncSheetFieldsIntoPlace(place); render();
     };
   });
+  if((el=document.getElementById("cat-add-chip"))){
+    el.onclick = function(){
+      S.sheet.addingCategory = true;
+      syncSheetFieldsIntoPlace(place); render();
+      var inp = document.getElementById("f-new-cat");
+      if(inp) inp.focus();
+    };
+  }
+  if((el=document.getElementById("f-new-cat"))){
+    el.onkeydown = function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("f-cat-add").click(); } };
+  }
   if((el=document.getElementById("f-cat-add"))){
     el.onclick = function(){
       var inp = document.getElementById("f-new-cat");
@@ -1104,7 +1118,7 @@ function bindSheet(){
       var cats = getCategories(place).slice();
       if(cats.indexOf(v)===-1) cats.push(v);
       place.categories = cats; delete place.category;
-      inp.value = "";
+      S.sheet.addingCategory = false;
       syncSheetFieldsIntoPlace(place); render();
     };
   }
