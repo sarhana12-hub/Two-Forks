@@ -906,11 +906,8 @@ function editSheetHtml(p){
 function reviewRowHtml(r){
   var name = personName(r.uid);
   var thumb = r.photo ? '<div class="photo-thumb" style="width:44px;height:44px;flex:none;"><img src="'+r.photo+'" alt=""></div>' : "";
-  var bits = [];
-  if(r.dishesLiked) bits.push(escapeHtml(r.dishesLiked));
-  if(r.comments) bits.push(escapeHtml(r.comments));
   var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
-  return '<div class="review-row" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'+
+  return '<div class="review-row" data-review-row="'+r.id+'" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">'+
     thumb+
     '<div style="flex:1;min-width:0;">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
@@ -921,7 +918,8 @@ function reviewRowHtml(r){
         '</div>'+
       '</div>'+
       '<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">'+escapeHtml(r.date||"")+(returnLabel?' · '+returnLabel:'')+'</div>'+
-      (bits.length?'<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">'+bits.join(" — ")+'</div>':'')+
+      (r.dishesLiked?'<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;"><b style="color:var(--ink);">Liked:</b> '+escapeHtml(r.dishesLiked)+'</div>':'')+
+      (r.comments?'<div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">'+escapeHtml(r.comments)+'</div>':'')+
     '</div>'+
   '</div>';
 }
@@ -1169,8 +1167,19 @@ function bindSheet(){
   if((el=document.getElementById("add-review-btn"))){
     el.onclick = function(){ syncSheetFieldsIntoPlace(place); openReviewDraft(null); render(); };
   }
+  document.querySelectorAll("[data-review-row]").forEach(function(row){
+    row.onclick = function(e){
+      if(e.target.closest("[data-review-edit]") || e.target.closest("[data-review-del]")) return;
+      var id = row.getAttribute("data-review-row");
+      var r = (place.reviews||[]).filter(function(x){return x.id===id;})[0];
+      syncSheetFieldsIntoPlace(place);
+      if(r) openReviewDraft(r);
+      render();
+    };
+  });
   document.querySelectorAll("[data-review-edit]").forEach(function(b){
-    b.onclick = function(){
+    b.onclick = function(e){
+      e.stopPropagation();
       var id = b.getAttribute("data-review-edit");
       var r = (place.reviews||[]).filter(function(x){return x.id===id;})[0];
       syncSheetFieldsIntoPlace(place);
@@ -1179,7 +1188,8 @@ function bindSheet(){
     };
   });
   document.querySelectorAll("[data-review-del]").forEach(function(b){
-    b.onclick = function(){
+    b.onclick = function(e){
+      e.stopPropagation();
       var id = b.getAttribute("data-review-del");
       place.reviews = (place.reviews||[]).filter(function(x){return x.id!==id;});
       syncSheetFieldsIntoPlace(place); render();
