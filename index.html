@@ -779,8 +779,8 @@ function tabbarHtml(){
 }
 
 /* ---------------- Sheet ---------------- */
-function blankPlace(status){
-  return { id: uid(), name:"", category:(S.space.categories||[])[0]||"", status: status||"want", address:"", website:"",
+function blankPlace(status, category){
+  return { id: uid(), name:"", category: category || (S.space.categories||[])[0]||"", status: status||"want", address:"", website:"",
     price:0, notes:"", tags:[], photos:[], ratings:{}, visitDate:"", wouldReturn:null, addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function normalizeUrl(u){
@@ -862,7 +862,7 @@ function editSheetHtml(p){
 function bindShell(){
   var el;
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.search=""; S.shuffleResult=null; render(); }; });
-  if((el=document.getElementById("fab-add"))) el.onclick = function(){ S.sheet={type:"edit", place: blankPlace(S.tab==="been"?"been":"want")}; S.confirmDeleteId=null; render(); };
+  if((el=document.getElementById("fab-add"))) el.onclick = function(){ S.sheet={type:"edit", place: blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)}; S.confirmDeleteId=null; render(); };
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
