@@ -438,14 +438,14 @@ function showToast(msg){
 var app = document.getElementById("app");
 function render(){
   if(!S.authChecked){
-    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">🍴</div><p style="color:var(--ink-soft);">Loading…</p></div></div></div>';
+    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks()+'</div><p style="color:var(--ink-soft);">Loading…</p></div></div></div>';
     return;
   }
   if(!S.authUser){ app.innerHTML = authHtml(); bindAuth(); return; }
   if(S.needsName){ app.innerHTML = nameHtml(); bindName(); return; }
   if(!S.spaceCode){ app.innerHTML = onboardingHtml(); bindOnboarding(); return; }
   if(S.loadingSpace){
-    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">🍴</div><p style="color:var(--ink-soft);">Loading your list…</p></div></div></div>';
+    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks()+'</div><p style="color:var(--ink-soft);">Loading your list…</p></div></div></div>';
     return;
   }
   var prevSheetBody = document.querySelector(".sheet-body");
@@ -463,7 +463,7 @@ function render(){
 function authHtml(){
   var signUp = S.authMode==="signup";
   var html = '<div class="shell"><div class="onboard">';
-  html += '<div class="onboard-hero" style="margin-top:6vh;margin-bottom:20px;"><div class="fork">🍴</div><h1 style="font-size:30px;">Two Forks</h1>'+
+  html += '<div class="onboard-hero" style="margin-top:6vh;margin-bottom:20px;"><div class="fork">'+iconTwoForks()+'</div><h1 style="font-size:30px;">Two Forks</h1>'+
     '<p>Keep track of every place you love — and everywhere you still want to try. Sign in to get started.</p></div>';
   if(S.authError) html += '<div class="err-box">'+escapeHtml(S.authError)+'</div>';
   html += '<button class="btn btn-secondary btn-block" id="google-btn" '+(S.authBusy?"disabled":"")+'>'+googleIcon()+' Continue with Google</button>';
@@ -540,7 +540,7 @@ function onboardingHtml(){
       '</div></div>';
   }
   return '<div class="shell"><div class="onboard">'+
-    '<div class="onboard-hero"><div class="fork">🍴</div><h1>Hi, '+escapeHtml(S.me)+'</h1>'+
+    '<div class="onboard-hero"><div class="fork">'+iconTwoForks()+'</div><h1>Hi, '+escapeHtml(S.me)+'</h1>'+
     '<p>Start a fresh list, or join one someone already shared with you.</p></div>'+
     '<div class="onboard-actions">'+
       '<button class="btn btn-primary btn-block" id="ob-start">Start a new list</button>'+
@@ -609,6 +609,22 @@ function iconMap(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill
 function iconTrash(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'; }
 function iconCopy(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>'; }
 function iconCamera(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>'; }
+function iconTwoForks(){
+  return '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-0.14em;">'+
+    '<g transform="rotate(-26 12 12)">'+
+      '<rect x="9.3" y="9" width="1.4" height="13" rx="0.7"/>'+
+      '<rect x="7.5" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+      '<rect x="9.35" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+      '<rect x="11.2" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+    '</g>'+
+    '<g transform="rotate(26 12 12)">'+
+      '<rect x="9.3" y="9" width="1.4" height="13" rx="0.7"/>'+
+      '<rect x="7.5" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+      '<rect x="9.35" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+      '<rect x="11.2" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+    '</g>'+
+  '</svg>';
+}
 
 /* ---------------- Shell ---------------- */
 function shellHtml(){
@@ -629,7 +645,7 @@ function headerHtml(){
     return '<div class="avatar" style="background:'+avatarColor(p.name)+'" title="'+escapeHtml(p.name)+'">'+initials(p.name)+'</div>';
   }).join("");
   var html = '<div class="header">';
-  html += '<div class="header-row"><div class="brand"><span class="fork">🍴</span><span>Two Forks</span></div><div class="people-row">'+avatars+'</div></div>';
+  html += '<div class="header-row"><div class="brand"><span class="fork">'+iconTwoForks()+'</span><span>Two Forks</span></div><div class="people-row">'+avatars+'</div></div>';
   html += '<div class="header-row"><h1 class="tabs-title display">'+title+'</h1>'+
     '<span class="sync-note"><span class="sync-dot" style="background:var(--accent)"></span>Synced</span></div>';
   if(S.tab==="been" || S.tab==="want"){
