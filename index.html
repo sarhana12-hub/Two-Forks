@@ -839,13 +839,69 @@ function blankPlace(status, category){
 function blankReview(){
   return { id: uid(), uid: S.meUid, rating:0, dishesLiked:"", comments:"", date: new Date().toISOString().slice(0,10), wouldReturn:null, photo:null, createdAt: new Date().toISOString() };
 }
+function openPlaceSheet(place, mode){
+  S.sheet = {type:"edit", place: Object.assign({}, place)};
+  S.sheet.originalPlace = Object.assign({}, S.sheet.place);
+  S.sheet.mode = mode || (place.isNew ? "edit" : "view");
+}
 function normalizeUrl(u){
   u = (u||"").trim();
   if(!u) return "";
   if(!/^https?:\/\//i.test(u)) u = "https://"+u;
   return u;
 }
-function sheetHtml(){ return S.sheet.type==="edit" ? editSheetHtml(S.sheet.place) : ""; }
+function sheetHtml(){
+  if(S.sheet.type!=="edit") return "";
+  return S.sheet.mode==="edit" ? editSheetHtml(S.sheet.place) : placeViewHtml(S.sheet.place);
+}
+function placeViewHtml(p){
+  var placeCats = getCategories(p);
+  var reviews = (p.reviews||[]).slice().sort(function(a,b){ return (b.date||b.createdAt||"").localeCompare(a.date||a.createdAt||""); });
+  var avg = avgRating(p.reviews);
+  var priceStr = p.price ? Array(p.price+1).join("$") : "";
+  var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
+  html += '<div class="sheet-header"><h2>'+escapeHtml(p.name||"Untitled")+'</h2><div style="display:flex;gap:8px;flex:none;">'+
+    '<button class="icon-btn" id="sheet-edit-btn" aria-label="Edit">'+iconEdit()+'</button>'+
+    '<button class="icon-btn" id="sheet-close">'+iconClose()+'</button>'+
+    '</div></div>';
+  html += '<div class="sheet-body">';
+  if(p.coverPhoto) html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
+  html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'+
+    '<span class="chip active" style="cursor:default;">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
+    (priceStr?'<span class="price-tag" style="font-size:14px;">'+priceStr+'</span>':'')+
+    '</div>';
+  if(placeCats.length || (p.tags&&p.tags.length)){
+    html += '<div class="tag-row" style="margin-bottom:12px;">'+
+      placeCats.map(function(c){return '<span class="tag-pill">'+escapeHtml(c)+'</span>';}).join("")+
+      (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
+      '</div>';
+  }
+  if(avg!=null){
+    var countStr = reviews.length===1 ? "1 review" : reviews.length+" reviews";
+    var per = perPersonAverages(p.reviews).map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
+    html += '<div class="rating-line" style="margin-bottom:14px;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(per?" · "+per:"")+'</span></div>';
+  }
+  if(p.address){
+    html += '<div class="field"><label>Location</label><div style="font-size:14.5px;color:var(--ink);">'+escapeHtml(p.address)+'</div>'+
+      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Open in Maps</a></div>';
+  }
+  if(p.website){
+    var siteFav = faviconUrl(p.website);
+    html += '<div class="field"><label>Website</label><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600;">'+
+      (siteFav?'<img src="'+siteFav+'" alt="" width="32" height="32" style="border-radius:8px;">':'')+
+      '<span>Open website</span></a></div>';
+  }
+  if(p.notes) html += '<div class="field"><label>Notes</label><div style="font-size:14.5px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(p.notes)+'</div></div>';
+  html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
+  if(!reviews.length){
+    html += '<p class="helper-text" style="margin:0 0 10px;">No reviews yet.</p>';
+  } else {
+    html += reviews.map(reviewRowHtml).join("");
+  }
+  html += '<button type="button" class="btn btn-secondary btn-block" id="add-review-btn" style="margin-top:6px;">'+iconPlus()+' Add a review</button></div>';
+  html += '</div></div></div>';
+  return html;
+}
 function editSheetHtml(p){
   var cats = sortCategories(S.space.categories||[]);
   var isNew = !!p.isNew;
@@ -959,7 +1015,7 @@ function reviewSheetHtml(){
 function bindShell(){
   var el;
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.search=""; S.shuffleResult=null; render(); }; });
-  if((el=document.getElementById("fab-add"))) el.onclick = function(){ S.sheet={type:"edit", place: blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)}; S.confirmDeleteId=null; render(); };
+  if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; render(); };
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
@@ -975,7 +1031,7 @@ function bindShell(){
       if(e.target.closest("a")) return;
       var id = card.getAttribute("data-id");
       var p = S.places.filter(function(x){return x.id===id;})[0];
-      if(p){ S.sheet={type:"edit", place: Object.assign({}, p)}; S.confirmDeleteId=null; render(); }
+      if(p){ openPlaceSheet(p); S.confirmDeleteId=null; render(); }
     };
   });
   document.querySelectorAll("[data-mark-been]").forEach(function(b){
@@ -984,7 +1040,7 @@ function bindShell(){
       var id = b.getAttribute("data-mark-been");
       var p = S.places.filter(function(x){return x.id===id;})[0];
       if(p){
-        S.sheet = {type:"edit", place: Object.assign({}, p)};
+        openPlaceSheet(p, "view");
         openReviewDraft(null);
         render();
       }
@@ -994,7 +1050,7 @@ function bindShell(){
   document.querySelectorAll("[data-shuffle-cat]").forEach(function(b){ b.onclick=function(){ S.shuffleCategory=b.getAttribute("data-shuffle-cat")||null; S.shuffleResult=null; render(); }; });
   if((el=document.getElementById("shuffle-go"))) el.onclick = runShuffle;
   if((el=document.getElementById("shuffle-again"))) el.onclick = runShuffle;
-  if((el=document.getElementById("shuffle-view"))) el.onclick = function(){ S.sheet={type:"edit", place: Object.assign({}, S.shuffleResult)}; render(); };
+  if((el=document.getElementById("shuffle-view"))) el.onclick = function(){ openPlaceSheet(S.shuffleResult); render(); };
 
   if((el=document.getElementById("copy-code"))) el.onclick = function(){
     var text = S.spaceCode;
@@ -1081,7 +1137,13 @@ function bindSheet(){
   var overlay = document.getElementById("sheet-overlay");
   if(overlay) overlay.onclick = function(e){ if(e.target===overlay) closeSheet(); };
   if((el=document.getElementById("sheet-close"))) el.onclick = closeSheet;
-  if((el=document.getElementById("sheet-cancel"))) el.onclick = closeSheet;
+  if((el=document.getElementById("sheet-cancel"))) el.onclick = function(){
+    if(S.sheet.place.isNew){ closeSheet(); return; }
+    S.sheet.place = Object.assign({}, S.sheet.originalPlace);
+    S.sheet.mode = "view";
+    render();
+  };
+  if((el=document.getElementById("sheet-edit-btn"))) el.onclick = function(){ S.sheet.mode = "edit"; render(); };
   var place = S.sheet.place;
 
   document.querySelectorAll("[data-set-status]").forEach(function(b){ b.onclick=function(){ place.status=b.getAttribute("data-set-status"); syncSheetFieldsIntoPlace(place); render(); }; });
