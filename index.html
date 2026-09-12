@@ -980,6 +980,28 @@ function reviewRowHtml(r){
   '</div>';
 }
 function reviewSheetHtml(){
+  return S.sheet.reviewMode==="edit" ? reviewEditHtml() : reviewViewHtml();
+}
+function reviewViewHtml(){
+  var r = S.sheet.reviewDraft;
+  var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
+  var html = '<div class="overlay" id="review-overlay" style="z-index:21;"><div class="sheet">';
+  html += '<div class="sheet-header"><h2>'+escapeHtml(personName(r.uid))+'\'s review</h2><div style="display:flex;gap:8px;flex:none;">'+
+    '<button class="icon-btn" id="review-edit-btn" aria-label="Edit">'+iconEdit()+'</button>'+
+    '<button class="icon-btn" id="review-close">'+iconClose()+'</button>'+
+    '</div></div><div class="sheet-body">';
+  if(r.photo) html += '<img src="'+r.photo+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'+
+    (r.rating?starsHtml(r.rating):'')+
+    '<span style="font-size:13px;color:var(--ink-faint);">'+escapeHtml(r.date||"")+'</span>'+
+    '</div>';
+  if(returnLabel) html += '<div class="field"><label>Would go back?</label><div style="font-size:14.5px;">'+returnLabel+'</div></div>';
+  if(r.dishesLiked) html += '<div class="field"><label>Dishes liked</label><div style="font-size:14.5px;">'+escapeHtml(r.dishesLiked)+'</div></div>';
+  if(r.comments) html += '<div class="field"><label>Comments</label><div style="font-size:14.5px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(r.comments)+'</div></div>';
+  html += '</div></div></div>';
+  return html;
+}
+function reviewEditHtml(){
   var r = S.sheet.reviewDraft;
   var isNewReview = !S.sheet.reviewEditingId;
   var people = (S.space.people&&S.space.people.length) ? S.space.people : [{uid:S.meUid, name:S.me}];
@@ -1235,7 +1257,7 @@ function bindSheet(){
       var id = row.getAttribute("data-review-row");
       var r = (place.reviews||[]).filter(function(x){return x.id===id;})[0];
       syncSheetFieldsIntoPlace(place);
-      if(r) openReviewDraft(r);
+      if(r) openReviewDraft(r, "view");
       render();
     };
   });
@@ -1245,7 +1267,7 @@ function bindSheet(){
       var id = b.getAttribute("data-review-edit");
       var r = (place.reviews||[]).filter(function(x){return x.id===id;})[0];
       syncSheetFieldsIntoPlace(place);
-      if(r) openReviewDraft(r);
+      if(r) openReviewDraft(r, "edit");
       render();
     };
   });
@@ -1291,9 +1313,11 @@ function preserveSheetInput(){
 function closeSheet(){ S.sheet=null; S.confirmDeleteId=null; render(); }
 
 /* ---------------- Review sub-sheet ---------------- */
-function openReviewDraft(existing){
+function openReviewDraft(existing, mode){
   if(existing){ S.sheet.reviewDraft = Object.assign({}, existing); S.sheet.reviewEditingId = existing.id; }
   else { S.sheet.reviewDraft = blankReview(); S.sheet.reviewEditingId = null; }
+  S.sheet.originalReview = Object.assign({}, S.sheet.reviewDraft);
+  S.sheet.reviewMode = mode || (existing ? "view" : "edit");
   S.sheet.reviewSetCover = false;
 }
 function closeReviewDraft(){ S.sheet.reviewDraft=null; S.sheet.reviewEditingId=null; S.sheet.reviewSetCover=false; render(); }
@@ -1310,7 +1334,13 @@ function bindReviewSheet(place){
   var overlay = document.getElementById("review-overlay");
   if(overlay) overlay.onclick = function(e){ if(e.target===overlay) closeReviewDraft(); };
   if((el=document.getElementById("review-close"))) el.onclick = closeReviewDraft;
-  if((el=document.getElementById("review-cancel"))) el.onclick = closeReviewDraft;
+  if((el=document.getElementById("review-cancel"))) el.onclick = function(){
+    if(!S.sheet.reviewEditingId){ closeReviewDraft(); return; }
+    S.sheet.reviewDraft = Object.assign({}, S.sheet.originalReview);
+    S.sheet.reviewMode = "view";
+    render();
+  };
+  if((el=document.getElementById("review-edit-btn"))) el.onclick = function(){ S.sheet.reviewMode = "edit"; render(); };
   document.querySelectorAll("[data-review-for]").forEach(function(b){
     b.onclick = function(){ syncReviewFieldsIntoDraft(); r.uid = b.getAttribute("data-review-for"); render(); };
   });
