@@ -866,6 +866,10 @@ function placeViewHtml(p){
     '</div></div>';
   html += '<div class="sheet-body">';
   if(p.coverPhoto) html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
+  html += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'+
+    '<h2 class="display" style="font-size:26px;margin:0;line-height:1.15;">'+escapeHtml(p.name||"Untitled")+'</h2>'+
+    (avg!=null?'<span class="mono" style="font-size:24px;font-weight:700;color:var(--gold);flex:none;">★ '+avg.toFixed(1)+'</span>':'')+
+    '</div>';
   html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'+
     '<span class="chip active" style="cursor:default;">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
     (priceStr?'<span class="price-tag" style="font-size:14px;">'+priceStr+'</span>':'')+
@@ -1276,7 +1280,8 @@ function bindSheet(){
       e.stopPropagation();
       var id = b.getAttribute("data-review-del");
       place.reviews = (place.reviews||[]).filter(function(x){return x.id!==id;});
-      syncSheetFieldsIntoPlace(place); render();
+      syncSheetFieldsIntoPlace(place);
+      persistPlaceQuiet(place, "Review deleted");
     };
   });
   if(S.sheet.reviewDraft) bindReviewSheet(place);
@@ -1311,6 +1316,15 @@ function preserveSheetInput(){
   if(S.sheet.reviewDraft) syncReviewFieldsIntoDraft();
 }
 function closeSheet(){ S.sheet=null; S.confirmDeleteId=null; render(); }
+function persistPlaceQuiet(place, successMsg){
+  var data = Object.assign({}, place);
+  var id = data.id; delete data.id; delete data.isNew;
+  return store.savePlace(S.spaceCode, id, data).then(function(){
+    place.isNew = false;
+    if(successMsg) showToast(successMsg);
+    render();
+  }).catch(function(){ showToast("Couldn't save — try again"); render(); });
+}
 
 /* ---------------- Review sub-sheet ---------------- */
 function openReviewDraft(existing, mode){
@@ -1379,8 +1393,9 @@ function bindReviewSheet(place){
       place.reviews = reviews;
       if(place.status==="want") place.status = "been";
       if(S.sheet.reviewSetCover && r.photo) place.coverPhoto = r.photo;
+      syncSheetFieldsIntoPlace(place);
       S.sheet.reviewDraft = null; S.sheet.reviewEditingId = null; S.sheet.reviewSetCover = false;
-      showToast("Review saved"); render();
+      persistPlaceQuiet(place, "Review saved");
     };
   }
 }
