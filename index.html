@@ -296,7 +296,6 @@ var FOOD_WORDS = ["TACO","PLUM","MISO","LIME","SAGE","KALE","CORN","OKRA","BEAN"
 var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 var DEFAULT_CATEGORIES = ["Tacos","Pizza","Coffee","Burgers","Sushi","Indian","Thai","Ice Cream","Bars & Drinks"];
 var AVATAR_COLORS = ["#1F6F5C","#B23A26","#B9862C","#4A6FA5","#8654A3","#3E8E7E","#C1583F","#5C7A2E"];
-var MAX_PHOTOS = 3;
 
 function genCode(){
   var w = FOOD_WORDS[Math.floor(Math.random()*FOOD_WORDS.length)];
@@ -332,11 +331,22 @@ function starsHtml(value){
   }
   return out+'</span>';
 }
-function avgRating(ratings){
-  if(!ratings) return null;
-  var vals = Object.values(ratings).filter(function(v){ return typeof v==="number" && v>0; });
+function avgRating(reviews){
+  if(!reviews || !reviews.length) return null;
+  var vals = reviews.map(function(r){return r.rating;}).filter(function(v){ return typeof v==="number" && v>0; });
   if(!vals.length) return null;
   return vals.reduce(function(a,b){return a+b;},0)/vals.length;
+}
+function perPersonAverages(reviews){
+  var byUid = {};
+  (reviews||[]).forEach(function(r){
+    if(typeof r.rating==="number" && r.rating>0){ (byUid[r.uid]=byUid[r.uid]||[]).push(r.rating); }
+  });
+  return Object.keys(byUid).map(function(theUid){
+    var vals = byUid[theUid];
+    var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length;
+    return { uid: theUid, name: personName(theUid), avg: avg, count: vals.length };
+  });
 }
 function getCategories(p){
   if(p.categories && p.categories.length) return p.categories;
@@ -599,7 +609,7 @@ function personName(theUid){
 /* ---------------- Icons ---------------- */
 function iconBack(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>'; }
 function iconClose(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'; }
-function iconPlus(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'; }
+function iconPlus(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'; }
 function iconCheck(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; }
 function iconCheckboxQuestion(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 2.5-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'; }
 function iconBookmark(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z"/></svg>'; }
@@ -607,6 +617,7 @@ function iconDice(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="curren
 function iconGear(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09A1.7 1.7 0 008.6 19a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.24 15a1.7 1.7 0 00-1.55-1H2.6a2 2 0 110-4h.09A1.7 1.7 0 004.24 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 008.6 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.76 9c.1.4.5 1.55 1.55 1.55H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></svg>'; }
 function iconMap(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-6 2V6l6-2 6 2 6-2v16l-6 2-6-2zM9 4v16M15 6v16"/></svg>'; }
 function iconTrash(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'; }
+function iconEdit(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>'; }
 function iconCopy(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>'; }
 function iconCamera(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>'; }
 function iconTwoForks(){
@@ -635,6 +646,7 @@ function shellHtml(){
   html += tabbarHtml();
   html += '</div>';
   if(S.sheet) html += sheetHtml();
+  if(S.sheet && S.sheet.reviewDraft) html += reviewSheetHtml();
   if(S.toast) html += '<div class="toast">'+escapeHtml(S.toast)+'</div>';
   return html;
 }
@@ -683,8 +695,9 @@ function tabContentHtml(){
   return "";
 }
 function placeCardHtml(p){
-  var thumb = (p.photos && p.photos[0]) ? '<img src="'+p.photos[0]+'" alt="">' : "🍽️";
-  var avg = avgRating(p.ratings);
+  var thumb = p.coverPhoto ? '<img src="'+p.coverPhoto+'" alt="">' : "🍽️";
+  var reviews = p.reviews||[];
+  var avg = avgRating(reviews);
   var priceStr = p.price ? Array(p.price+1).join("$") : "";
   var metaBits = [];
   var placeCats = getCategories(p);
@@ -700,8 +713,9 @@ function placeCardHtml(p){
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
   html += '<div class="place-meta">'+metaBits.map(function(m,i){return (i>0?'<span class="dot-sep"></span>':'')+m;}).join("")+'</div>';
   if(avg!=null){
-    var per = Object.keys(p.ratings||{}).filter(function(k){return p.ratings[k]>0;}).map(function(k){ return escapeHtml(personName(k))+" "+p.ratings[k]; }).join(" · ");
-    html += '<div class="rating-line">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+per+'</span></div>';
+    var countStr = reviews.length===1 ? "1 review" : reviews.length+" reviews";
+    var per = perPersonAverages(reviews).map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
+    html += '<div class="rating-line">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(per?" · "+per:"")+'</span></div>';
   }
   if((p.status||"want")==="want" && p.notes) html += '<div class="per-person" style="margin-top:6px;">🍴 '+escapeHtml(p.notes)+'</div>';
   if(p.tags && p.tags.length) html += '<div class="tag-row">'+p.tags.map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+'</div>';
@@ -744,7 +758,7 @@ function emptyStateHtml(kind){
 }
 function beenTabHtml(){
   var list = filteredPlaces("been");
-  if(S.sortBeen==="top") list = list.slice().sort(function(a,b){ return (avgRating(b.ratings)||0)-(avgRating(a.ratings)||0); });
+  if(S.sortBeen==="top") list = list.slice().sort(function(a,b){ return (avgRating(b.reviews)||0)-(avgRating(a.reviews)||0); });
   else if(S.sortBeen==="recent") list = list.slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
   else list = list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
   if(!list.length) return emptyStateHtml("been");
@@ -777,7 +791,7 @@ function shuffleTabHtml(){
   html += '<div class="chip-row" style="margin-top:12px;"><button class="chip'+(!S.shuffleCategory?" active":"")+'" data-shuffle-cat="">Any category</button>'+
     cats.map(function(c){ return '<button class="chip'+(S.shuffleCategory===c?" active":"")+'" data-shuffle-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; }).join("")+'</div>';
   if(S.shuffleResult){
-    var p = S.shuffleResult; var avg = avgRating(p.ratings);
+    var p = S.shuffleResult; var avg = avgRating(p.reviews);
     html += '<div class="shuffle-card"><div class="fork">'+(S.shuffleMode==="new"?"🎲":"⭐")+'</div>'+
       '<h3 class="display">'+escapeHtml(p.name)+'</h3><div class="cat">'+escapeHtml(getCategories(p).join(", "))+(p.address?" · "+escapeHtml(p.address):"")+'</div>'+
       (avg!=null?('<div class="rating-line" style="justify-content:center;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b></div>'):"")+
@@ -820,7 +834,10 @@ function tabbarHtml(){
 /* ---------------- Sheet ---------------- */
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", website:"",
-    price:0, notes:"", tags:[], photos:[], ratings:{}, visitDate:"", wouldReturn:null, addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+    price:0, notes:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+}
+function blankReview(){
+  return { id: uid(), uid: S.meUid, rating:0, dishesLiked:"", comments:"", date: new Date().toISOString().slice(0,10), wouldReturn:null, photo:null, createdAt: new Date().toISOString() };
 }
 function normalizeUrl(u){
   u = (u||"").trim();
@@ -832,7 +849,6 @@ function sheetHtml(){ return S.sheet.type==="edit" ? editSheetHtml(S.sheet.place
 function editSheetHtml(p){
   var cats = sortCategories(S.space.categories||[]);
   var isNew = !!p.isNew;
-  S.sheet.ratingFor = S.sheet.ratingFor || S.meUid;
   var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
   html += '<div class="sheet-header"><h2>'+(isNew?"Add a place":"Edit place")+'</h2><button class="icon-btn" id="sheet-close">'+iconClose()+'</button></div><div class="sheet-body">';
   html += '<div class="segment" style="margin-bottom:16px;"><button class="'+(p.status==="want"?"active":"")+'" data-set-status="want">Want to go</button>'+
@@ -857,36 +873,23 @@ function editSheetHtml(p){
     html += '<div style="margin:-8px 0 14px;"><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
       (siteFav?'<img src="'+siteFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open website</a></div>';
   }
-  if(p.status==="been"){
-    html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
-    var ratingPeople = (S.space.people&&S.space.people.length) ? S.space.people : [{uid:S.meUid, name:S.me}];
-    var ratingForVal = (p.ratings && p.ratings[S.sheet.ratingFor]) || 0;
-    html += '<div class="field"><label>Rating</label>';
-    if(ratingPeople.length>1){
-      html += '<div class="segment" style="margin-bottom:10px;">'+ratingPeople.map(function(person){
-        return '<button class="'+(S.sheet.ratingFor===person.uid?"active":"")+'" data-rating-for="'+person.uid+'">'+escapeHtml(person.name)+'</button>';
-      }).join("")+'</div>';
-    }
-    html += '<div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
-        var fill = ratingForVal>=i ? "full" : (ratingForVal>=i-0.5 ? "half" : "empty");
-        return '<button data-star="'+i+'">'+starSvg(fill)+'</button>';
-      }).join("")+'</div></div>';
-    html += '<div class="field"><label for="f-date">Visit date</label><input type="date" id="f-date" value="'+escapeHtml(p.visitDate||"")+'"></div>';
-    html += '<div class="field"><label>Would you go back?</label><div class="segment">'+["yes","unsure","no"].map(function(v){ return '<button class="'+(p.wouldReturn===v?"active":"")+'" data-return="'+v+'">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>'; }).join("")+'</div></div>';
-  }
-  if(p.status==="want"){
-    html += '<div class="field"><label for="f-notes">Dishes to try <span style="text-transform:none;font-weight:400;">(optional)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
-  } else {
-    html += '<div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" placeholder="What did you order? What stood out?">'+escapeHtml(p.notes||"")+'</textarea></div>';
-  }
+  html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
+  html += '<div class="field"><label>Cover photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
+    (p.coverPhoto ?
+      '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1">'+iconClose()+'</button></div>' :
+      '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">')+
+    '</div></div>';
+  html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label>Tags</label><div class="tag-input-row"><input type="text" id="f-tag-input" placeholder="e.g. patio, date night"><button class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
     '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
-  if(p.status==="been"){
-    html += '<div class="field"><label>Photos '+(p.photos&&p.photos.length?('<span style="text-transform:none;font-weight:400;">('+p.photos.length+'/'+MAX_PHOTOS+')</span>'):'')+'</label><div class="photo-row" id="photo-row">'+
-      (p.photos||[]).map(function(src,i){ return '<div class="photo-thumb"><img src="'+src+'" alt=""><button data-photo-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+
-      ((p.photos||[]).length < MAX_PHOTOS ? '<button class="photo-add" id="photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="photo-file" accept="image/*" style="display:none;">' : "")+
-      '</div></div>';
+  var reviews = (p.reviews||[]).slice().sort(function(a,b){ return (b.date||b.createdAt||"").localeCompare(a.date||a.createdAt||""); });
+  html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
+  if(!reviews.length){
+    html += '<p class="helper-text" style="margin:0 0 10px;">No reviews yet.</p>';
+  } else {
+    html += reviews.map(reviewRowHtml).join("");
   }
+  html += '<button type="button" class="btn btn-secondary btn-block" id="add-review-btn" style="margin-top:6px;">'+iconPlus()+' Add a review</button></div>';
   if(!isNew){
     if(S.confirmDeleteId===p.id){
       html += '<div class="confirm-box"><p>Delete this place for everyone on the list? This can\'t be undone.</p><div class="row"><button class="btn btn-secondary btn-block" id="del-cancel">Cancel</button><button class="btn btn-danger btn-block" id="del-confirm">Delete</button></div></div>';
@@ -895,6 +898,59 @@ function editSheetHtml(p){
     }
   }
   html += '</div><div class="sheet-footer"><button class="btn btn-secondary btn-block" id="sheet-cancel">Cancel</button><button class="btn btn-primary btn-block" id="sheet-save">Save</button></div></div></div>';
+  return html;
+}
+function reviewRowHtml(r){
+  var name = personName(r.uid);
+  var thumb = r.photo ? '<div class="photo-thumb" style="width:44px;height:44px;flex:none;"><img src="'+r.photo+'" alt=""></div>' : "";
+  var bits = [];
+  if(r.dishesLiked) bits.push(escapeHtml(r.dishesLiked));
+  if(r.comments) bits.push(escapeHtml(r.comments));
+  var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
+  return '<div class="review-row" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'+
+    thumb+
+    '<div style="flex:1;min-width:0;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
+        '<div style="font-weight:600;font-size:13.5px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
+        '<div style="display:flex;gap:4px;flex:none;">'+
+          '<button class="icon-btn" style="width:28px;height:28px;" data-review-edit="'+r.id+'">'+iconEdit()+'</button>'+
+          '<button class="icon-btn" style="width:28px;height:28px;" data-review-del="'+r.id+'">'+iconTrash()+'</button>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">'+escapeHtml(r.date||"")+(returnLabel?' · '+returnLabel:'')+'</div>'+
+      (bits.length?'<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">'+bits.join(" — ")+'</div>':'')+
+    '</div>'+
+  '</div>';
+}
+function reviewSheetHtml(){
+  var r = S.sheet.reviewDraft;
+  var isNewReview = !S.sheet.reviewEditingId;
+  var people = (S.space.people&&S.space.people.length) ? S.space.people : [{uid:S.meUid, name:S.me}];
+  var html = '<div class="overlay" id="review-overlay" style="z-index:21;"><div class="sheet">';
+  html += '<div class="sheet-header"><h2>'+(isNewReview?"Add a review":"Edit review")+'</h2><button class="icon-btn" id="review-close">'+iconClose()+'</button></div><div class="sheet-body">';
+  if(people.length>1){
+    html += '<div class="field"><label>Who\'s this from?</label><div class="segment">'+people.map(function(person){
+      return '<button class="'+(r.uid===person.uid?"active":"")+'" data-review-for="'+person.uid+'">'+escapeHtml(person.name)+'</button>';
+    }).join("")+'</div></div>';
+  }
+  html += '<div class="field"><label>Rating</label><div class="star-input" id="review-rating-input">'+[1,2,3,4,5].map(function(i){
+      var fill = r.rating>=i ? "full" : (r.rating>=i-0.5 ? "half" : "empty");
+      return '<button data-review-star="'+i+'">'+starSvg(fill)+'</button>';
+    }).join("")+'</div></div>';
+  html += '<div class="field"><label for="rv-dishes">Dishes liked <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="rv-dishes" value="'+escapeHtml(r.dishesLiked||"")+'" placeholder="Pad see ew, tom yum"></div>';
+  html += '<div class="field"><label for="rv-comments">Comments <span style="text-transform:none;font-weight:400;">(optional)</span></label><textarea id="rv-comments" placeholder="What stood out? Would you recommend it?">'+escapeHtml(r.comments||"")+'</textarea></div>';
+  html += '<div class="field"><label for="rv-date">Date</label><input type="date" id="rv-date" value="'+escapeHtml(r.date||"")+'"></div>';
+  html += '<div class="field"><label>Would you go back?</label><div class="segment">'+["yes","unsure","no"].map(function(v){ return '<button class="'+(r.wouldReturn===v?"active":"")+'" data-review-return="'+v+'">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>'; }).join("")+'</div></div>';
+  html += '<div class="field"><label>Photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
+    (r.photo ?
+      '<div class="photo-thumb"><img src="'+r.photo+'" alt=""><button data-review-photo-del="1">'+iconClose()+'</button></div>' :
+      '<button class="photo-add" id="review-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="review-photo-file" accept="image/*" style="display:none;">')+
+    '</div>';
+  if(r.photo){
+    html += '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink);"><input type="checkbox" id="rv-set-cover" '+(S.sheet.reviewSetCover?"checked":"")+' style="width:16px;height:16px;"> Set as this restaurant\'s cover photo</label>';
+  }
+  html += '</div>';
+  html += '</div><div class="sheet-footer"><button class="btn btn-secondary btn-block" id="review-cancel">Cancel</button><button class="btn btn-primary btn-block" id="review-save">Save review</button></div></div></div>';
   return html;
 }
 
@@ -926,7 +982,11 @@ function bindShell(){
       e.stopPropagation();
       var id = b.getAttribute("data-mark-been");
       var p = S.places.filter(function(x){return x.id===id;})[0];
-      if(p){ var np = Object.assign({}, p, {status:"been", visitDate: p.visitDate || new Date().toISOString().slice(0,10)}); S.sheet={type:"edit", place: np}; render(); }
+      if(p){
+        S.sheet = {type:"edit", place: Object.assign({}, p)};
+        openReviewDraft(null);
+        render();
+      }
     };
   });
   document.querySelectorAll("[data-shuffle-mode]").forEach(function(b){ b.onclick=function(){ S.shuffleMode=b.getAttribute("data-shuffle-mode"); S.shuffleResult=null; render(); }; });
@@ -999,7 +1059,7 @@ function runShuffle(){
     if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
     if(S.shuffleMode==="new") return (p.status||"want")==="want";
     if((p.status||"want")!=="been") return false;
-    var avg = avgRating(p.ratings);
+    var avg = avgRating(p.reviews);
     return avg==null || avg>=4;
   });
   if(!pool.length){
@@ -1025,18 +1085,6 @@ function bindSheet(){
 
   document.querySelectorAll("[data-set-status]").forEach(function(b){ b.onclick=function(){ place.status=b.getAttribute("data-set-status"); syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-price]").forEach(function(b){ b.onclick=function(){ var n=+b.getAttribute("data-price"); place.price = place.price===n?0:n; syncSheetFieldsIntoPlace(place); render(); }; });
-  document.querySelectorAll("[data-return]").forEach(function(b){ b.onclick=function(){ place.wouldReturn=b.getAttribute("data-return"); syncSheetFieldsIntoPlace(place); render(); }; });
-  document.querySelectorAll("[data-rating-for]").forEach(function(b){ b.onclick=function(){ S.sheet.ratingFor=b.getAttribute("data-rating-for"); render(); }; });
-  document.querySelectorAll("[data-star]").forEach(function(b){
-    b.onclick = function(){
-      var forUid = S.sheet.ratingFor || S.meUid;
-      var i = +b.getAttribute("data-star");
-      var cur = (place.ratings && place.ratings[forUid]) || 0;
-      var next = cur===i ? i-0.5 : (cur===i-0.5 ? 0 : i);
-      place.ratings = Object.assign({}, place.ratings); place.ratings[forUid] = next;
-      syncSheetFieldsIntoPlace(place); render();
-    };
-  });
   document.querySelectorAll("[data-cat-toggle]").forEach(function(b){
     b.onclick = function(){
       var c = b.getAttribute("data-cat-toggle");
@@ -1090,20 +1138,40 @@ function bindSheet(){
   document.querySelectorAll("[data-tag-del]").forEach(function(b){
     b.onclick = function(){ var i=+b.getAttribute("data-tag-del"); place.tags=(place.tags||[]).slice(); place.tags.splice(i,1); syncSheetFieldsIntoPlace(place); render(); };
   });
-  document.querySelectorAll("[data-photo-del]").forEach(function(b){
-    b.onclick = function(){ var i=+b.getAttribute("data-photo-del"); place.photos=(place.photos||[]).slice(); place.photos.splice(i,1); syncSheetFieldsIntoPlace(place); render(); };
+  document.querySelectorAll("[data-cover-del]").forEach(function(b){
+    b.onclick = function(){ place.coverPhoto = null; syncSheetFieldsIntoPlace(place); render(); };
   });
-  if((el=document.getElementById("photo-add-btn"))) el.onclick = function(){ document.getElementById("photo-file").click(); };
-  if((el=document.getElementById("photo-file"))){
+  if((el=document.getElementById("cover-photo-add-btn"))) el.onclick = function(){ document.getElementById("cover-photo-file").click(); };
+  if((el=document.getElementById("cover-photo-file"))){
     el.onchange = function(){
       var file = this.files && this.files[0]; if(!file) return;
       showToast("Adding photo…");
       fileToCompressedDataUrl(file, 640, 0.55).then(function(dataUrl){
-        place.photos = (place.photos||[]).concat([dataUrl]);
+        place.coverPhoto = dataUrl;
         syncSheetFieldsIntoPlace(place); render();
       }).catch(function(){ showToast("Couldn't add that photo"); });
     };
   }
+  if((el=document.getElementById("add-review-btn"))){
+    el.onclick = function(){ syncSheetFieldsIntoPlace(place); openReviewDraft(null); render(); };
+  }
+  document.querySelectorAll("[data-review-edit]").forEach(function(b){
+    b.onclick = function(){
+      var id = b.getAttribute("data-review-edit");
+      var r = (place.reviews||[]).filter(function(x){return x.id===id;})[0];
+      syncSheetFieldsIntoPlace(place);
+      if(r) openReviewDraft(r);
+      render();
+    };
+  });
+  document.querySelectorAll("[data-review-del]").forEach(function(b){
+    b.onclick = function(){
+      var id = b.getAttribute("data-review-del");
+      place.reviews = (place.reviews||[]).filter(function(x){return x.id!==id;});
+      syncSheetFieldsIntoPlace(place); render();
+    };
+  });
+  if(S.sheet.reviewDraft) bindReviewSheet(place);
   if((el=document.getElementById("del-start"))) el.onclick = function(){ S.confirmDeleteId = place.id; render(); };
   if((el=document.getElementById("del-cancel"))) el.onclick = function(){ S.confirmDeleteId = null; render(); };
   if((el=document.getElementById("del-confirm"))) el.onclick = function(){
@@ -1127,11 +1195,79 @@ function syncSheetFieldsIntoPlace(place){
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-address"))) place.address = el.value;
   if((el=document.getElementById("f-website"))) place.website = el.value;
-  if((el=document.getElementById("f-date"))) place.visitDate = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
 }
-function preserveSheetInput(){ if(S.sheet && S.sheet.place) syncSheetFieldsIntoPlace(S.sheet.place); }
+function preserveSheetInput(){
+  if(!S.sheet || !S.sheet.place) return;
+  syncSheetFieldsIntoPlace(S.sheet.place);
+  if(S.sheet.reviewDraft) syncReviewFieldsIntoDraft();
+}
 function closeSheet(){ S.sheet=null; S.confirmDeleteId=null; render(); }
+
+/* ---------------- Review sub-sheet ---------------- */
+function openReviewDraft(existing){
+  if(existing){ S.sheet.reviewDraft = Object.assign({}, existing); S.sheet.reviewEditingId = existing.id; }
+  else { S.sheet.reviewDraft = blankReview(); S.sheet.reviewEditingId = null; }
+  S.sheet.reviewSetCover = false;
+}
+function closeReviewDraft(){ S.sheet.reviewDraft=null; S.sheet.reviewEditingId=null; S.sheet.reviewSetCover=false; render(); }
+function syncReviewFieldsIntoDraft(){
+  var r = S.sheet && S.sheet.reviewDraft; if(!r) return;
+  var el;
+  if((el=document.getElementById("rv-dishes"))) r.dishesLiked = el.value;
+  if((el=document.getElementById("rv-comments"))) r.comments = el.value;
+  if((el=document.getElementById("rv-date"))) r.date = el.value;
+}
+function bindReviewSheet(place){
+  var el;
+  var r = S.sheet.reviewDraft;
+  var overlay = document.getElementById("review-overlay");
+  if(overlay) overlay.onclick = function(e){ if(e.target===overlay) closeReviewDraft(); };
+  if((el=document.getElementById("review-close"))) el.onclick = closeReviewDraft;
+  if((el=document.getElementById("review-cancel"))) el.onclick = closeReviewDraft;
+  document.querySelectorAll("[data-review-for]").forEach(function(b){
+    b.onclick = function(){ syncReviewFieldsIntoDraft(); r.uid = b.getAttribute("data-review-for"); render(); };
+  });
+  document.querySelectorAll("[data-review-star]").forEach(function(b){
+    b.onclick = function(){
+      var i = +b.getAttribute("data-review-star");
+      var next = r.rating===i ? i-0.5 : (r.rating===i-0.5 ? 0 : i);
+      syncReviewFieldsIntoDraft(); r.rating = next; render();
+    };
+  });
+  document.querySelectorAll("[data-review-return]").forEach(function(b){
+    b.onclick = function(){ syncReviewFieldsIntoDraft(); r.wouldReturn = b.getAttribute("data-review-return"); render(); };
+  });
+  if((el=document.getElementById("review-photo-add-btn"))) el.onclick = function(){ document.getElementById("review-photo-file").click(); };
+  if((el=document.getElementById("review-photo-file"))){
+    el.onchange = function(){
+      var file = this.files && this.files[0]; if(!file) return;
+      showToast("Adding photo…");
+      fileToCompressedDataUrl(file, 640, 0.55).then(function(dataUrl){
+        syncReviewFieldsIntoDraft(); r.photo = dataUrl; render();
+      }).catch(function(){ showToast("Couldn't add that photo"); });
+    };
+  }
+  document.querySelectorAll("[data-review-photo-del]").forEach(function(b){
+    b.onclick = function(){ syncReviewFieldsIntoDraft(); r.photo = null; S.sheet.reviewSetCover=false; render(); };
+  });
+  if((el=document.getElementById("rv-set-cover"))){
+    el.onchange = function(){ S.sheet.reviewSetCover = this.checked; };
+  }
+  if((el=document.getElementById("review-save"))){
+    el.onclick = function(){
+      syncReviewFieldsIntoDraft();
+      var reviews = (place.reviews||[]).slice();
+      var idx = reviews.findIndex(function(x){return x.id===r.id;});
+      if(idx>-1) reviews[idx]=r; else reviews.push(r);
+      place.reviews = reviews;
+      if(place.status==="want") place.status = "been";
+      if(S.sheet.reviewSetCover && r.photo) place.coverPhoto = r.photo;
+      S.sheet.reviewDraft = null; S.sheet.reviewEditingId = null; S.sheet.reviewSetCover = false;
+      showToast("Review saved"); render();
+    };
+  }
+}
 
 /* ---------------- Boot ---------------- */
 onAuthStateChanged(auth, function(user){
