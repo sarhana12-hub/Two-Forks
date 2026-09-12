@@ -659,6 +659,7 @@ function placeCardHtml(p){
   var metaBits = [];
   if(p.category) metaBits.push(escapeHtml(p.category));
   if(p.address) metaBits.push(escapeHtml(p.address));
+  if(p.website) metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener">Menu ↗</a>');
   var html = '<div class="place-card" data-id="'+p.id+'">';
   html += '<div class="place-thumb">'+thumb+'</div><div class="place-main">';
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
@@ -667,6 +668,7 @@ function placeCardHtml(p){
     var per = Object.keys(p.ratings||{}).filter(function(k){return p.ratings[k]>0;}).map(function(k){ return escapeHtml(personName(k))+" "+p.ratings[k]; }).join(" · ");
     html += '<div class="rating-line">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+per+'</span></div>';
   }
+  if((p.status||"want")==="want" && p.notes) html += '<div class="per-person" style="margin-top:6px;">🍴 '+escapeHtml(p.notes)+'</div>';
   if(p.tags && p.tags.length) html += '<div class="tag-row">'+p.tags.map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+'</div>';
   if((p.status||"want")==="want") html += '<div class="want-actions"><button class="btn btn-secondary btn-sm" data-mark-been="'+p.id+'">'+iconCheck()+' Been there</button></div>';
   html += '</div></div>';
@@ -758,8 +760,14 @@ function tabbarHtml(){
 
 /* ---------------- Sheet ---------------- */
 function blankPlace(status){
-  return { id: uid(), name:"", category:(S.space.categories||[])[0]||"", status: status||"want", address:"",
+  return { id: uid(), name:"", category:(S.space.categories||[])[0]||"", status: status||"want", address:"", website:"",
     price:0, notes:"", tags:[], photos:[], ratings:{}, visitDate:"", wouldReturn:null, addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+}
+function normalizeUrl(u){
+  u = (u||"").trim();
+  if(!u) return "";
+  if(!/^https?:\/\//i.test(u)) u = "https://"+u;
+  return u;
 }
 function sheetHtml(){ return S.sheet.type==="edit" ? editSheetHtml(S.sheet.place) : ""; }
 function editSheetHtml(p){
@@ -777,25 +785,32 @@ function editSheetHtml(p){
   html += '<div class="field"><label for="f-category">Category</label><div class="cat-row"><select id="f-category">'+
     catOptions.map(function(c){ return '<option value="'+escapeHtml(c)+'"'+(c===p.category?" selected":"")+'>'+escapeHtml(c)+'</option>'; }).join("")+
     '<option value="__new__">+ New category…</option></select></div></div>';
-  html += '<div class="field"><label for="f-address">Address <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
+  html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
-  html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
-  html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
-      var fill = myRating>=i ? "full" : (myRating>=i-0.5 ? "half" : "empty");
-      return '<button data-star="'+i+'">'+starSvg(fill)+'</button>';
-    }).join("")+'</div></div>';
-  if(others.length) html += '<div class="others-ratings">'+others.map(function(k){ return '<div class="row"><span>'+escapeHtml(personName(k))+'</span>'+starsHtml(p.ratings[k])+'</div>'; }).join("")+'</div>';
+  html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…"></div>';
   if(p.status==="been"){
+    html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
+    html += '<div class="field"><label>Your rating</label><div class="star-input" id="rating-input">'+[1,2,3,4,5].map(function(i){
+        var fill = myRating>=i ? "full" : (myRating>=i-0.5 ? "half" : "empty");
+        return '<button data-star="'+i+'">'+starSvg(fill)+'</button>';
+      }).join("")+'</div></div>';
+    if(others.length) html += '<div class="others-ratings">'+others.map(function(k){ return '<div class="row"><span>'+escapeHtml(personName(k))+'</span>'+starsHtml(p.ratings[k])+'</div>'; }).join("")+'</div>';
     html += '<div class="field"><label for="f-date">Visit date</label><input type="date" id="f-date" value="'+escapeHtml(p.visitDate||"")+'"></div>';
     html += '<div class="field"><label>Would you go back?</label><div class="segment">'+["yes","unsure","no"].map(function(v){ return '<button class="'+(p.wouldReturn===v?"active":"")+'" data-return="'+v+'">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>'; }).join("")+'</div></div>';
   }
-  html += '<div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" placeholder="What did you order? What stood out?">'+escapeHtml(p.notes||"")+'</textarea></div>';
+  if(p.status==="want"){
+    html += '<div class="field"><label for="f-notes">Dishes to try <span style="text-transform:none;font-weight:400;">(optional)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
+  } else {
+    html += '<div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" placeholder="What did you order? What stood out?">'+escapeHtml(p.notes||"")+'</textarea></div>';
+  }
   html += '<div class="field"><label>Tags</label><div class="tag-input-row"><input type="text" id="f-tag-input" placeholder="e.g. patio, date night"><button class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
     '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
-  html += '<div class="field"><label>Photos '+(p.photos&&p.photos.length?('<span style="text-transform:none;font-weight:400;">('+p.photos.length+'/'+MAX_PHOTOS+')</span>'):'')+'</label><div class="photo-row" id="photo-row">'+
-    (p.photos||[]).map(function(src,i){ return '<div class="photo-thumb"><img src="'+src+'" alt=""><button data-photo-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+
-    ((p.photos||[]).length < MAX_PHOTOS ? '<button class="photo-add" id="photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="photo-file" accept="image/*" style="display:none;">' : "")+
-    '</div></div>';
+  if(p.status==="been"){
+    html += '<div class="field"><label>Photos '+(p.photos&&p.photos.length?('<span style="text-transform:none;font-weight:400;">('+p.photos.length+'/'+MAX_PHOTOS+')</span>'):'')+'</label><div class="photo-row" id="photo-row">'+
+      (p.photos||[]).map(function(src,i){ return '<div class="photo-thumb"><img src="'+src+'" alt=""><button data-photo-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+
+      ((p.photos||[]).length < MAX_PHOTOS ? '<button class="photo-add" id="photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="photo-file" accept="image/*" style="display:none;">' : "")+
+      '</div></div>';
+  }
   if(!isNew){
     if(S.confirmDeleteId===p.id){
       html += '<div class="confirm-box"><p>Delete this place for everyone on the list? This can\'t be undone.</p><div class="row"><button class="btn btn-secondary btn-block" id="del-cancel">Cancel</button><button class="btn btn-danger btn-block" id="del-confirm">Delete</button></div></div>';
@@ -824,6 +839,7 @@ function bindShell(){
   document.querySelectorAll(".place-card").forEach(function(card){
     card.onclick = function(e){
       if(e.target.closest("[data-mark-been]")) return;
+      if(e.target.closest("a")) return;
       var id = card.getAttribute("data-id");
       var p = S.places.filter(function(x){return x.id===id;})[0];
       if(p){ S.sheet={type:"edit", place: Object.assign({}, p)}; S.confirmDeleteId=null; render(); }
@@ -984,6 +1000,7 @@ function bindSheet(){
   if((el=document.getElementById("sheet-save"))) el.onclick = function(){
     syncSheetFieldsIntoPlace(place);
     if(!place.name || !place.name.trim()){ showToast("Give it a name first"); return; }
+    place.website = normalizeUrl(place.website);
     var data = Object.assign({}, place);
     var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){
@@ -995,6 +1012,7 @@ function syncSheetFieldsIntoPlace(place){
   var el;
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-address"))) place.address = el.value;
+  if((el=document.getElementById("f-website"))) place.website = el.value;
   if((el=document.getElementById("f-date"))) place.visitDate = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
 }
