@@ -703,7 +703,7 @@ function emptyStateHtml(kind){
     var verb = kind==="been" ? "logged" : "on your want-to-go list";
     return '<div class="empty"><span class="fork">'+emoji+'</span><p>No '+escapeHtml(S.categoryFilter)+' spots '+verb+' yet. Tap + to add one, or pick "All" above to see everything else.</p></div>';
   }
-  if(kind==="been") return '<div class="empty"><span class="fork">🌮</span><p>No places yet. Tap + to log the best taco spot in town.</p></div>';
+  if(kind==="been") return '<div class="empty"><span class="fork">🍽️</span><p>No places yet. Tap + to log the first spot you\'ve tried.</p></div>';
   return '<div class="empty"><span class="fork">📍</span><p>Nothing on your list to try yet. Add a place you have been wanting to check out.</p></div>';
 }
 function beenTabHtml(){
