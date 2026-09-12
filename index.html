@@ -681,7 +681,7 @@ function filteredPlaces(status){
     if((p.status||"want")!==status) return false;
     if(S.categoryFilter && getCategories(p).indexOf(S.categoryFilter)===-1) return false;
     if(q){
-      var hay = [p.name,p.notes].concat(getCategories(p)).concat(p.tags||[]).join(" ").toLowerCase();
+      var hay = [p.name,p.notes,p.source].concat(getCategories(p)).concat(p.tags||[]).join(" ").toLowerCase();
       if(hay.indexOf(q)===-1) return false;
     }
     return true;
@@ -717,7 +717,10 @@ function placeCardHtml(p){
     var per = perPersonAverages(reviews).map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
     html += '<div class="rating-line">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(per?" · "+per:"")+'</span></div>';
   }
-  if((p.status||"want")==="want" && p.notes) html += '<div class="per-person" style="margin-top:6px;">🍴 '+escapeHtml(p.notes)+'</div>';
+  if((p.status||"want")==="want"){
+    if(p.notes) html += '<div class="per-person" style="margin-top:6px;"><b style="color:var(--ink);">Want to try:</b> '+escapeHtml(p.notes)+'</div>';
+    if(p.source) html += '<div class="per-person" style="margin-top:2px;"><b style="color:var(--ink);">Source:</b> '+escapeHtml(p.source)+'</div>';
+  }
   if(p.tags && p.tags.length) html += '<div class="tag-row">'+p.tags.map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+'</div>';
   if((p.status||"want")==="want") html += '<div class="want-actions"><button class="btn btn-secondary btn-sm" data-mark-been="'+p.id+'">'+iconCheckboxQuestion()+' Been here?</button></div>';
   html += '</div></div>';
@@ -834,7 +837,7 @@ function tabbarHtml(){
 /* ---------------- Sheet ---------------- */
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", website:"",
-    price:0, notes:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+    price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function blankReview(){
   return { id: uid(), uid: S.meUid, rating:0, dishesLiked:"", comments:"", date: new Date().toISOString().slice(0,10), wouldReturn:null, photo:null, createdAt: new Date().toISOString() };
@@ -895,6 +898,7 @@ function placeViewHtml(p){
       (siteFav?'<img src="'+siteFav+'" alt="" width="32" height="32" style="border-radius:8px;">':'')+
       '<span>Open website</span></a></div>';
   }
+  if(p.source) html += '<div class="field"><label>Source</label><div style="font-size:14.5px;color:var(--ink-soft);">'+escapeHtml(p.source)+'</div></div>';
   if(p.notes) html += '<div class="field"><label>Notes</label><div style="font-size:14.5px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(p.notes)+'</div></div>';
   html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
   if(!reviews.length){
@@ -942,6 +946,7 @@ function editSheetHtml(p){
       '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1">'+iconClose()+'</button></div>' :
       '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">')+
     '</div></div>';
+  html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by Sam, saw on Reddit, NYT article…"></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label>Tags</label><div class="tag-input-row"><input type="text" id="f-tag-input" placeholder="e.g. patio, date night"><button class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
     '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
@@ -1308,6 +1313,7 @@ function syncSheetFieldsIntoPlace(place){
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-address"))) place.address = el.value;
   if((el=document.getElementById("f-website"))) place.website = el.value;
+  if((el=document.getElementById("f-source"))) place.source = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
 }
 function preserveSheetInput(){
