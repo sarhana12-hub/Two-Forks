@@ -294,7 +294,7 @@ try{ enableIndexedDbPersistence(dbase).catch(function(){}); }catch(e){}
 
 var FOOD_WORDS = ["TACO","PLUM","MISO","LIME","SAGE","KALE","CORN","OKRA","BEAN","RICE","MINT","PEAR","FIGS","NUTS","EGGS","SOUP","STEW","CAKE","TART","BUNS","ROLL","CHAI","BREW","SALT","CRAB","CLAM","TUNA","DUCK","LAMB","PORK","SUSH","DILL","LEEK","YAMS","OATS","CURR","COCO","BASI","NAAN","PHOS"];
 var CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-var DEFAULT_CATEGORIES = ["Tacos","Pizza","Coffee","Brunch","Burgers","Ramen","Ice Cream","Bars & Drinks"];
+var DEFAULT_CATEGORIES = ["Tacos","Pizza","Coffee","Burgers","Sushi","Indian","Thai","Ice Cream","Bars & Drinks"];
 var AVATAR_COLORS = ["#1F6F5C","#B23A26","#B9862C","#4A6FA5","#8654A3","#3E8E7E","#C1583F","#5C7A2E"];
 var MAX_PHOTOS = 3;
 
@@ -641,7 +641,7 @@ function headerHtml(){
   return html;
 }
 function categoryChipsHtml(){
-  var cats = S.space.categories || [];
+  var cats = sortCategories(S.space.categories||[]);
   var html = '<div class="chip-row"><button class="chip'+(S.categoryFilter?"":" active")+'" data-cat="">All</button>';
   cats.forEach(function(c){ html += '<button class="chip'+(S.categoryFilter===c?" active":"")+'" data-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; });
   html += '</div>';
@@ -696,9 +696,18 @@ function placeCardHtml(p){
 function categoryEmoji(cat){
   var map = {
     "tacos":"🌮", "pizza":"🍕", "coffee":"☕", "brunch":"🥞", "burgers":"🍔",
-    "ramen":"🍜", "ice cream":"🍨", "bars & drinks":"🍸"
+    "ramen":"🍜", "ice cream":"🍨", "bars & drinks":"🍸",
+    "sushi":"🍣", "indian":"🍛", "thai":"🍜"
   };
   return map[(cat||"").trim().toLowerCase()] || "🍽️";
+}
+function isDrinkCategory(name){ return (name||"").toLowerCase().indexOf("drink")>-1; }
+function sortCategories(cats){
+  return (cats||[]).slice().sort(function(a,b){
+    var da = isDrinkCategory(a)?1:0, db = isDrinkCategory(b)?1:0;
+    if(da!==db) return da-db;
+    return a.localeCompare(b);
+  });
 }
 function emptyStateHtml(kind){
   var emoji = S.categoryFilter ? categoryEmoji(S.categoryFilter) : (kind==="been" ? "🌮" : "📍");
@@ -734,13 +743,13 @@ function wantTabHtml(){
     var cs = getCategories(p); if(!cs.length) cs=["Uncategorized"];
     cs.forEach(function(c){ (byCat[c]=byCat[c]||[]).push(p); });
   });
-  return Object.keys(byCat).sort().map(function(c){
+  return sortCategories(Object.keys(byCat)).map(function(c){
     var items = byCat[c].sort(function(a,b){return a.name.localeCompare(b.name);});
     return '<div class="category-group"><div class="category-title">'+escapeHtml(c)+' <span class="count">'+items.length+'</span></div>'+items.map(placeCardHtml).join("")+'</div>';
   }).join("");
 }
 function shuffleTabHtml(){
-  var cats = S.space.categories||[];
+  var cats = sortCategories(S.space.categories||[]);
   var html = '<div class="shuffle-wrap">';
   html += '<div class="segment"><button class="'+(S.shuffleMode==="new"?"active":"")+'" data-shuffle-mode="new">Somewhere new</button>'+
     '<button class="'+(S.shuffleMode==="favorite"?"active":"")+'" data-shuffle-mode="favorite">Go-to favorite</button></div>';
@@ -776,8 +785,8 @@ function settingsTabHtml(){
 
   html += '<div class="card-panel">';
   html += '<div class="section-heading" style="margin-top:0;">Categories</div>';
-  (S.space.categories||[]).forEach(function(c,i){
-    html += '<div class="cat-manage-row"><input type="text" data-cat-edit="'+i+'" value="'+escapeHtml(c)+'"><button class="icon-btn" data-cat-del="'+i+'">'+iconTrash()+'</button></div>';
+  sortCategories(S.space.categories||[]).forEach(function(c){
+    html += '<div class="cat-manage-row"><input type="text" data-cat-edit="'+escapeHtml(c)+'" value="'+escapeHtml(c)+'"><button class="icon-btn" data-cat-del="'+escapeHtml(c)+'">'+iconTrash()+'</button></div>';
   });
   html += '<div class="tag-input-row" style="margin-top:10px;"><input type="text" id="new-cat-input" placeholder="New category"><button class="btn btn-secondary" id="new-cat-add">Add</button></div></div>';
   return html;
@@ -800,7 +809,7 @@ function normalizeUrl(u){
 }
 function sheetHtml(){ return S.sheet.type==="edit" ? editSheetHtml(S.sheet.place) : ""; }
 function editSheetHtml(p){
-  var cats = S.space.categories||[];
+  var cats = sortCategories(S.space.categories||[]);
   var isNew = !!p.isNew;
   S.sheet.ratingFor = S.sheet.ratingFor || S.meUid;
   var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
@@ -927,11 +936,12 @@ function bindShell(){
 
   document.querySelectorAll("[data-cat-edit]").forEach(function(inp){
     inp.onchange = function(){
-      var i = +inp.getAttribute("data-cat-edit");
+      var oldName = inp.getAttribute("data-cat-edit");
       var cats = (S.space.categories||[]).slice();
-      var oldName = cats[i];
+      var idx = cats.indexOf(oldName);
+      if(idx===-1) return;
       var newName = inp.value.trim() || oldName;
-      cats[i] = newName;
+      cats[idx] = newName;
       store.updateSpace(S.spaceCode, {categories: cats});
       if(newName!==oldName){
         S.places.filter(function(p){return getCategories(p).indexOf(oldName)>-1;}).forEach(function(p){
@@ -945,8 +955,10 @@ function bindShell(){
   });
   document.querySelectorAll("[data-cat-del]").forEach(function(b){
     b.onclick = function(){
-      var i = +b.getAttribute("data-cat-del");
-      var cats = (S.space.categories||[]).slice(); cats.splice(i,1);
+      var name = b.getAttribute("data-cat-del");
+      var cats = (S.space.categories||[]).slice();
+      var idx = cats.indexOf(name);
+      if(idx>-1) cats.splice(idx,1);
       store.updateSpace(S.spaceCode, {categories: cats}); render();
     };
   });
