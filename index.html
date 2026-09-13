@@ -7,6 +7,8 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#FBF8F2">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon.ico">
+<link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -258,6 +260,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 
 .helper-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.5; margin:0 0 14px; }
 .center-loading{ margin-top:30vh; text-align:center; }
+.center-loading .fork{ font-size:40px; line-height:1; margin-bottom:14px; }
 </style>
 </head>
 <body>
@@ -447,14 +450,14 @@ function showToast(msg){
 var app = document.getElementById("app");
 function render(){
   if(!S.authChecked){
-    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks()+'</div><p style="color:var(--ink-soft);">Loading…</p></div></div></div>';
+    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks(true)+'</div><p style="color:var(--ink-soft);">Loading…</p></div></div></div>';
     return;
   }
   if(!S.authUser){ app.innerHTML = authHtml(); bindAuth(); return; }
   if(S.needsName){ app.innerHTML = nameHtml(); bindName(); return; }
   if(!S.spaceCode){ app.innerHTML = onboardingHtml(); bindOnboarding(); return; }
   if(S.loadingSpace){
-    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks()+'</div><p style="color:var(--ink-soft);">Loading your list…</p></div></div></div>';
+    app.innerHTML = '<div class="shell"><div class="onboard"><div class="center-loading"><div class="fork">'+iconTwoForks(true)+'</div><p style="color:var(--ink-soft);">Loading your list…</p></div></div></div>';
     return;
   }
   var prevSheetBody = document.querySelector(".sheet-body");
@@ -472,7 +475,7 @@ function render(){
 function authHtml(){
   var signUp = S.authMode==="signup";
   var html = '<div class="shell"><div class="onboard">';
-  html += '<div class="onboard-hero" style="margin-top:6vh;margin-bottom:20px;"><div class="fork">'+iconTwoForks()+'</div><h1 style="font-size:30px;">Two Forks</h1>'+
+  html += '<div class="onboard-hero" style="margin-top:6vh;margin-bottom:20px;"><div class="fork">'+iconTwoForks(true)+'</div><h1 style="font-size:30px;">Two Forks</h1>'+
     '<p>Keep track of every place you love — and everywhere you still want to try. Sign in to get started.</p></div>';
   if(S.authError) html += '<div class="err-box">'+escapeHtml(S.authError)+'</div>';
   html += '<button class="btn btn-secondary btn-block" id="google-btn" '+(S.authBusy?"disabled":"")+'>'+googleIcon()+' Continue with Google</button>';
@@ -549,7 +552,7 @@ function onboardingHtml(){
       '</div></div>';
   }
   return '<div class="shell"><div class="onboard">'+
-    '<div class="onboard-hero"><div class="fork">'+iconTwoForks()+'</div><h1>Hi, '+escapeHtml(S.me)+'</h1>'+
+    '<div class="onboard-hero"><div class="fork">'+iconTwoForks(true)+'</div><h1>Hi, '+escapeHtml(S.me)+'</h1>'+
     '<p>Start a fresh list, or join one someone already shared with you.</p></div>'+
     '<div class="onboard-actions">'+
       '<button class="btn btn-primary btn-block" id="ob-start">Start a new list</button>'+
@@ -619,19 +622,22 @@ function iconTrash(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fi
 function iconEdit(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>'; }
 function iconCopy(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>'; }
 function iconCamera(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>'; }
-function iconTwoForks(){
-  return '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="vertical-align:-0.14em;">'+
-    '<g transform="rotate(-26 12 12)">'+
-      '<rect x="9.3" y="9" width="1.4" height="13" rx="0.7"/>'+
-      '<rect x="7.5" y="2" width="1.3" height="6.5" rx="0.6"/>'+
-      '<rect x="9.35" y="2" width="1.3" height="6.5" rx="0.6"/>'+
-      '<rect x="11.2" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+function iconTwoForks(large){
+  var ridge = large ? (
+    '<g stroke="#73531B" stroke-width="1.6" stroke-linecap="round" opacity="0.75">'+
+      '<line x1="14.5" y1="21" x2="18.5" y2="17.5"/><line x1="19" y1="12.5" x2="23.5" y2="10.5"/><line x1="27" y1="6.5" x2="31" y2="9"/><line x1="35.5" y1="10.5" x2="38.5" y2="14.5"/><line x1="42.5" y1="17" x2="46.5" y2="18.5"/>'+
+      '<line x1="85.5" y1="21" x2="81.5" y2="17.5"/><line x1="81" y1="12.5" x2="76.5" y2="10.5"/><line x1="73" y1="6.5" x2="69" y2="9"/><line x1="64.5" y1="10.5" x2="61.5" y2="14.5"/><line x1="57.5" y1="17" x2="53.5" y2="18.5"/>'+
+    '</g>'
+  ) : '';
+  return '<svg width="1em" height="1em" viewBox="0 0 100 100" style="vertical-align:-0.14em;">'+
+    '<g fill="none" stroke="var(--gold)" stroke-width="6.5" stroke-linecap="round">'+
+      '<path d="M 12,30 C 18,7 27,2 34,9 C 40,15 45,19 48,18 C 51,17 50,23 45,24.5"/>'+
+      '<path d="M 88,30 C 82,7 73,2 66,9 C 60,15 55,19 52,18 C 49,17 50,23 55,24.5"/>'+
     '</g>'+
-    '<g transform="rotate(26 12 12)">'+
-      '<rect x="9.3" y="9" width="1.4" height="13" rx="0.7"/>'+
-      '<rect x="7.5" y="2" width="1.3" height="6.5" rx="0.6"/>'+
-      '<rect x="9.35" y="2" width="1.3" height="6.5" rx="0.6"/>'+
-      '<rect x="11.2" y="2" width="1.3" height="6.5" rx="0.6"/>'+
+    ridge+
+    '<g fill="var(--chili)">'+
+      '<g transform="rotate(-30 50 92)"><rect x="47" y="56" width="6" height="36" rx="3"/><path d="M 42,42 Q 42,38 46,38 L 54,38 Q 58,38 58,42 L 58,52 Q 58,58 50,58 Q 42,58 42,52 Z"/><rect x="43" y="10" width="3.6" height="32" rx="1.8"/><rect x="48.2" y="10" width="3.6" height="32" rx="1.8"/><rect x="53.4" y="10" width="3.6" height="32" rx="1.8"/></g>'+
+      '<g transform="rotate(30 50 92)"><rect x="47" y="56" width="6" height="36" rx="3"/><path d="M 42,42 Q 42,38 46,38 L 54,38 Q 58,38 58,42 L 58,52 Q 58,58 50,58 Q 42,58 42,52 Z"/><rect x="43" y="10" width="3.6" height="32" rx="1.8"/><rect x="48.2" y="10" width="3.6" height="32" rx="1.8"/><rect x="53.4" y="10" width="3.6" height="32" rx="1.8"/></g>'+
     '</g>'+
   '</svg>';
 }
