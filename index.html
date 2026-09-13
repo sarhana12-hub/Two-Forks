@@ -284,6 +284,10 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .export-section-label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#888; margin:12px 0 4px; }
 .export-review{ padding:8px 0; border-top:1px solid #eee; font-size:12.5px; }
 .export-review:first-child{ border-top:none; }
+.export-status-card{ background:var(--surface); border-radius:16px; padding:32px 24px; text-align:center; max-width:300px; margin:0 20px; box-shadow:var(--shadow-lift); }
+.export-spinner{ width:32px; height:32px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--accent); margin:0 auto; animation:exportSpin 0.8s linear infinite; }
+@keyframes exportSpin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .export-spinner{ animation:none; border-top-color:var(--border); } }
 @media print{
   #app{ display:none; }
   #print-area{ display:block; }
@@ -506,7 +510,7 @@ var S = {
   places:[], tab:"been", search:"", categoryFilter:null, activeFilters:[], sortBeen:"top",
   sheet:null, confirmDeleteId:null, confirmDeleteReviewId:null, toast:null,
   shuffleMode:"new", shuffleCategory:null, shuffleResult:null,
-  exportPicker:null,
+  exportPicker:null, exporting:false,
   joinDraft:false, startDraft:false, loadingSpace:false
 };
 
@@ -730,6 +734,7 @@ function shellHtml(){
   if(S.sheet) html += sheetHtml();
   if(S.sheet && S.sheet.reviewDraft) html += reviewSheetHtml();
   if(S.exportPicker) html += exportPickerHtml();
+  if(S.exporting) html += exportingOverlayHtml();
   if(S.toast) html += '<div class="toast">'+escapeHtml(S.toast)+'</div>';
   return html;
 }
@@ -1050,18 +1055,34 @@ function exportPlaceCardHtml(p){
   html += '</div>';
   return html;
 }
+function exportingOverlayHtml(){
+  return '<div class="overlay" style="align-items:center;z-index:40;"><div class="export-status-card">'+
+    '<div class="export-spinner" aria-hidden="true"></div>'+
+    '<p style="margin:16px 0 0;font-weight:600;color:var(--ink);">Preparing your PDF…</p>'+
+    '<p class="helper-text" style="margin-top:6px;">You\'ll be notified when the print preview is ready.</p>'+
+    '</div></div>';
+}
+var exportSafetyTimer = null;
+function clearExportingState(){
+  if(exportSafetyTimer){ clearTimeout(exportSafetyTimer); exportSafetyTimer = null; }
+  if(S.exporting){ S.exporting = false; render(); }
+}
 function runExport(ids){
   var chosen = S.places.filter(function(p){ return ids.indexOf(p.id)>-1; });
   if(!chosen.length){ showToast("Pick at least one restaurant"); return; }
-  var html = '<div class="export-doc">'+
-    '<div class="export-header"><h1>Two Forks</h1><p>Restaurant picks from '+escapeHtml(S.me||"")+' · '+escapeHtml(new Date().toLocaleDateString())+'</p></div>'+
-    chosen.map(exportPlaceCardHtml).join("")+
-    '</div>';
-  var pa = document.getElementById("print-area");
-  if(pa) pa.innerHTML = html;
   S.exportPicker = null;
+  S.exporting = true;
   render();
-  setTimeout(function(){ window.print(); }, 80);
+  setTimeout(function(){
+    var html = '<div class="export-doc">'+
+      '<div class="export-header"><h1>Two Forks</h1><p>Restaurant picks from '+escapeHtml(S.me||"")+' · '+escapeHtml(new Date().toLocaleDateString())+'</p></div>'+
+      chosen.map(exportPlaceCardHtml).join("")+
+      '</div>';
+    var pa = document.getElementById("print-area");
+    if(pa) pa.innerHTML = html;
+    exportSafetyTimer = setTimeout(clearExportingState, 8000);
+    window.print();
+  }, 60);
 }
 
 /* ---------------- Sheet ---------------- */
@@ -1953,7 +1974,9 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
 
+window.addEventListener('beforeprint', clearExportingState);
 window.addEventListener('afterprint', function(){
+  clearExportingState();
   var pa = document.getElementById('print-area');
   if(pa) pa.innerHTML = "";
 });
