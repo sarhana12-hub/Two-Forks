@@ -312,7 +312,7 @@ function uid(){ return Date.now().toString(36) + Math.random().toString(36).slic
 function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 function avatarColor(name){ var h=0; name=name||"?"; for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i))>>>0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
 function initials(name){ name=(name||"?").trim(); if(!name) return "?"; var parts=name.split(/\s+/); return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase(); }
-function mapsUrl(name,address){ var q=[name,address].filter(Boolean).join(" "); return "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q); }
+function mapsUrl(name,address){ var q=[name,address].filter(Boolean).join(" "); return "https://maps.apple.com/?daddr="+encodeURIComponent(q); }
 function webSearchUrl(name,address){ var q=[name,address,"menu"].filter(Boolean).join(" "); return "https://www.google.com/search?q="+encodeURIComponent(q); }
 function faviconUrl(website){
   try{ var host = new URL(website).hostname; return "https://www.google.com/s2/favicons?domain="+encodeURIComponent(host)+"&sz=32"; }
@@ -895,7 +895,7 @@ function placeViewHtml(p){
   }
   if(p.address){
     html += '<div class="field"><label>Location</label><div style="font-size:14px;color:var(--ink);">'+escapeHtml(p.address)+'</div>'+
-      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Open in Maps</a></div>';
+      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Get Directions</a></div>';
   }
   if(p.website){
     var siteFav = faviconUrl(p.website);
@@ -933,7 +933,7 @@ function editSheetHtml(p){
     (S.sheet.addingCategory ? '<div class="tag-input-row" style="margin-top:8px;"><input type="text" id="f-new-cat" placeholder="New category"><button type="button" class="btn btn-secondary btn-sm" id="f-cat-add">Add</button></div>' : '')+
     '</div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
-  if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
+  if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;">'+iconMap()+' Get Directions</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
     '<input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
