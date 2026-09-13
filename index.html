@@ -267,10 +267,33 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .helper-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.5; margin:0 0 14px; }
 .center-loading{ margin-top:30vh; text-align:center; }
 .center-loading .fork{ font-size:40px; line-height:1; margin-bottom:14px; }
+
+.export-pick-row{ cursor:pointer; }
+#print-area{ display:none; }
+.export-doc{ font-family:'Work Sans', system-ui, sans-serif; color:#1a1a1a; background:#fff; padding:24px; max-width:800px; margin:0 auto; }
+.export-doc a{ color:#1a5c4a; }
+.export-header{ text-align:center; margin-bottom:28px; }
+.export-header h1{ font-family:'Fraunces', serif; font-size:28px; margin:0 0 4px; }
+.export-header p{ margin:0; font-size:13px; color:#666; }
+.export-card{ break-inside:avoid-page; page-break-inside:avoid; padding:18px 0; border-bottom:2px solid #ddd; }
+.export-card:last-child{ border-bottom:none; }
+.export-card h2{ font-family:'Fraunces', serif; font-size:20px; margin:0 0 4px; }
+.export-badge{ display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px; border-radius:999px; background:#eee; color:#333; margin-right:6px; }
+.export-meta{ font-size:12.5px; color:#444; margin:4px 0; line-height:1.5; }
+.export-photo{ width:100%; max-width:360px; border-radius:10px; margin:8px 0; display:block; }
+.export-section-label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#888; margin:12px 0 4px; }
+.export-review{ padding:8px 0; border-top:1px solid #eee; font-size:12.5px; }
+.export-review:first-child{ border-top:none; }
+@media print{
+  #app{ display:none; }
+  #print-area{ display:block; }
+  @page{ margin:0.6in; }
+}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="print-area"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -483,6 +506,7 @@ var S = {
   places:[], tab:"been", search:"", categoryFilter:null, activeFilters:[], sortBeen:"top",
   sheet:null, confirmDeleteId:null, confirmDeleteReviewId:null, toast:null,
   shuffleMode:"new", shuffleCategory:null, shuffleResult:null,
+  exportPicker:null,
   joinDraft:false, startDraft:false, loadingSpace:false
 };
 
@@ -705,6 +729,7 @@ function shellHtml(){
   html += '</div>';
   if(S.sheet) html += sheetHtml();
   if(S.sheet && S.sheet.reviewDraft) html += reviewSheetHtml();
+  if(S.exportPicker) html += exportPickerHtml();
   if(S.toast) html += '<div class="toast">'+escapeHtml(S.toast)+'</div>';
   return html;
 }
@@ -909,6 +934,11 @@ function settingsTabHtml(){
     '</div></div>';
 
   html += '<div class="card-panel" style="margin-bottom:16px;">';
+  html += '<div class="section-heading" style="margin-top:0;">Export restaurants</div>';
+  html += '<p class="helper-text">Pick some restaurants and turn them into a printable PDF you can send without a link.</p>';
+  html += '<button class="btn btn-secondary btn-block" id="open-export-picker">Select restaurants to export</button></div>';
+
+  html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="settings-row"><div><div class="label">You are</div><div class="sub">'+escapeHtml((S.authUser&&S.authUser.email)||"")+'</div></div>'+
     '<button class="btn btn-secondary btn-sm" id="rename-me">'+escapeHtml(S.me)+'</button></div>';
   var people = (S.space.people||[]).filter(function(p){return p.uid!==S.meUid;});
@@ -934,6 +964,104 @@ function settingsTabHtml(){
 function tabbarHtml(){
   function item(key,label,icon){ return '<button class="'+(S.tab===key?"active":"")+'" data-tab="'+key+'">'+icon+'<span>'+label+'</span></button>'; }
   return '<div class="tabbar">'+item("been","Been There",iconBookmark())+item("want","Want to Go",iconMap())+item("shuffle","Surprise",iconDice())+item("settings","Settings",iconGear())+'</div>';
+}
+
+/* ---------------- Export ---------------- */
+function exportPickerHtml(){
+  var sel = S.exportPicker.selected;
+  var been = S.places.filter(function(p){ return (p.status||"want")==="been"; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  var want = S.places.filter(function(p){ return (p.status||"want")==="want"; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  function rowHtml(p){
+    var checked = !!sel[p.id];
+    return '<label class="export-pick-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'+
+      '<input type="checkbox" data-export-pick="'+p.id+'" '+(checked?"checked":"")+' style="width:18px;height:18px;flex:none;">'+
+      '<span style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14.5px;">'+escapeHtml(p.name||"Untitled")+'</div>'+
+      '<div style="font-size:12px;color:var(--ink-faint);">'+escapeHtml(getCategories(p).join(", "))+'</div></span></label>';
+  }
+  var html = '<div class="overlay" id="export-overlay"><div class="sheet">';
+  html += '<div class="sheet-header"><h2>Export restaurants</h2><button class="icon-btn" id="export-close" aria-label="Close">'+iconClose()+'</button></div>';
+  html += '<div class="sheet-body">';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;">'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="export-select-all" style="flex:1;">Select all</button>'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="export-select-none" style="flex:1;">Select none</button></div>';
+  if(been.length) html += '<div class="section-heading" style="margin-top:0;">Been There</div>'+been.map(rowHtml).join("");
+  if(want.length) html += '<div class="section-heading">Want to Go</div>'+want.map(rowHtml).join("");
+  if(!been.length && !want.length) html += '<p class="helper-text">No restaurants on this list yet.</p>';
+  html += '</div>';
+  var count = Object.keys(sel).filter(function(id){ return sel[id]; }).length;
+  html += '<div class="sheet-footer"><button class="btn btn-secondary btn-block" id="export-cancel">Cancel</button>'+
+    '<button class="btn btn-primary btn-block" id="export-go" '+(count?"":"disabled")+'>Export'+(count?(" ("+count+")"):"")+'</button></div>';
+  html += '</div></div>';
+  return html;
+}
+function exportPlaceCardHtml(p){
+  var cats = getCategories(p);
+  var priceStr = p.price ? Array(p.price+1).join("$") : "";
+  var reviews = p.reviews||[];
+  var avg = avgRating(reviews);
+  var per = perPersonAverages(reviews);
+  var hh = getHappyHour(p);
+  var hhActive = hasHappyHour(p);
+  var loc = [p.neighborhood, p.address].filter(Boolean).join(" · ");
+  var html = '<div class="export-card">';
+  html += '<h2>'+escapeHtml(p.name||"Untitled")+'</h2>';
+  html += '<div class="export-meta"><span class="export-badge">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
+    (cats.length?escapeHtml(cats.join(", ")):"")+(priceStr?" · "+priceStr:"")+(loc?" · "+escapeHtml(loc):"")+'</div>';
+  if(p.name && p.name.trim()) html += '<div class="export-meta"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'">Get Directions</a></div>';
+  if(p.coverPhoto) html += '<img class="export-photo" src="'+p.coverPhoto+'" alt="">';
+  if(avg!=null){
+    var perStr = per.map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
+    html += '<div class="export-meta"><b>★ '+avg.toFixed(1)+'</b> average'+(perStr?" ("+perStr+")":"")+'</div>';
+  }
+  var badges = [];
+  if(p.patio) badges.push("Patio");
+  if(hhActive) badges.push("Happy Hour");
+  if(badges.length) html += '<div class="export-meta">'+badges.map(function(b){ return '<span class="export-badge">'+b+'</span>'; }).join("")+'</div>';
+  if(hhActive){
+    var activeDays = DAYS_OF_WEEK.filter(function(d){ return hh.days[d.key].active; });
+    if(activeDays.length){
+      html += '<div class="export-section-label">Happy Hour</div>'+activeDays.map(function(d){
+        var day = hh.days[d.key];
+        var range = (day.start&&day.end) ? (formatTime12h(day.start)+' – '+formatTime12h(day.end)) : 'Hours not set';
+        return '<div class="export-meta">'+d.label+': '+escapeHtml(range)+'</div>';
+      }).join("");
+    }
+    if(p.happyHourMenuUrl) html += '<div class="export-meta">Happy Hour menu: <a href="'+escapeHtml(p.happyHourMenuUrl)+'">'+escapeHtml(p.happyHourMenuUrl)+'</a></div>';
+  }
+  if(p.website) html += '<div class="export-meta">Website: <a href="'+escapeHtml(p.website)+'">'+escapeHtml(p.website)+'</a></div>';
+  if((p.tags||[]).length) html += '<div class="export-meta">Tags: '+escapeHtml(p.tags.join(", "))+'</div>';
+  if(p.source) html += '<div class="export-meta"><b>Source:</b> '+escapeHtml(p.source)+'</div>';
+  if(p.notes) html += '<div class="export-meta"><b>Notes:</b> '+escapeHtml(p.notes)+'</div>';
+  if(reviews.length){
+    var sortedReviews = reviews.slice().sort(function(a,b){ return (b.date||b.createdAt||"").localeCompare(a.date||a.createdAt||""); });
+    html += '<div class="export-section-label">Reviews</div>'+sortedReviews.map(function(r){
+      var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
+      var bits = [];
+      if(r.rating) bits.push('★ '+r.rating.toFixed(1));
+      if(r.date) bits.push(escapeHtml(r.date));
+      if(returnLabel) bits.push(returnLabel);
+      var rHtml = '<div class="export-review"><div><b>'+escapeHtml(personName(r.uid))+'</b>'+(bits.length?(' — '+bits.join(' · ')):'')+'</div>';
+      if(r.dishesLiked) rHtml += '<div>Liked: '+escapeHtml(r.dishesLiked)+'</div>';
+      if(r.comments) rHtml += '<div>'+escapeHtml(r.comments)+'</div>';
+      rHtml += '</div>';
+      return rHtml;
+    }).join("");
+  }
+  html += '</div>';
+  return html;
+}
+function runExport(ids){
+  var chosen = S.places.filter(function(p){ return ids.indexOf(p.id)>-1; });
+  if(!chosen.length){ showToast("Pick at least one restaurant"); return; }
+  var html = '<div class="export-doc">'+
+    '<div class="export-header"><h1>Two Forks</h1><p>Restaurant picks from '+escapeHtml(S.me||"")+' · '+escapeHtml(new Date().toLocaleDateString())+'</p></div>'+
+    chosen.map(exportPlaceCardHtml).join("")+
+    '</div>';
+  var pa = document.getElementById("print-area");
+  if(pa) pa.innerHTML = html;
+  S.exportPicker = null;
+  render();
+  setTimeout(function(){ window.print(); }, 80);
 }
 
 /* ---------------- Sheet ---------------- */
@@ -1299,6 +1427,20 @@ function bindShell(){
     var text = location.origin+location.pathname;
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ showToast("Link copied"); }); }
     else { showToast("Link: "+text); }
+  };
+  if((el=document.getElementById("open-export-picker"))) el.onclick = function(){ S.exportPicker = {selected:{}}; render(); };
+  if((el=document.getElementById("export-close"))) el.onclick = function(){ S.exportPicker = null; render(); };
+  if((el=document.getElementById("export-cancel"))) el.onclick = function(){ S.exportPicker = null; render(); };
+  if((el=document.getElementById("export-select-all"))) el.onclick = function(){
+    S.places.forEach(function(p){ S.exportPicker.selected[p.id] = true; }); render();
+  };
+  if((el=document.getElementById("export-select-none"))) el.onclick = function(){ S.exportPicker.selected = {}; render(); };
+  document.querySelectorAll("[data-export-pick]").forEach(function(cb){
+    cb.onchange = function(){ S.exportPicker.selected[cb.getAttribute("data-export-pick")] = cb.checked; render(); };
+  });
+  if((el=document.getElementById("export-go"))) el.onclick = function(){
+    var ids = Object.keys(S.exportPicker.selected).filter(function(id){ return S.exportPicker.selected[id]; });
+    runExport(ids);
   };
   if((el=document.getElementById("rename-me"))) el.onclick = function(){
     var name = prompt("Your name", S.me);
@@ -1810,6 +1952,11 @@ setInterval(function(){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
+
+window.addEventListener('afterprint', function(){
+  var pa = document.getElementById('print-area');
+  if(pa) pa.innerHTML = "";
+});
 </script>
 </body>
 </html>
