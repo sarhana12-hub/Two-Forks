@@ -141,9 +141,6 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .chip{ flex:none; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface);
   font-size:14px; font-weight:600; color:var(--ink-soft); cursor:pointer; white-space:nowrap; }
 .chip.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
-.hh-filter-toggle{ display:inline-flex; align-items:center; gap:6px; margin:8px 0 2px; padding:7px 14px; border-radius:999px;
-  border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
-.hh-filter-toggle.active{ background:var(--chili); border-color:var(--chili); color:var(--accent-ink); }
 
 .content{ flex:1; padding:14px 18px calc(96px + env(safe-area-inset-bottom)); overflow-y:auto; }
 
@@ -378,6 +375,10 @@ function getHappyHour(p){
   });
   return { enabled: !!hh.enabled, days: days };
 }
+function hasHappyHour(p){
+  var hh = getHappyHour(p);
+  return hh.enabled && DAYS_OF_WEEK.some(function(d){ return hh.days[d.key].active; });
+}
 function formatTime12h(t){
   if(!t) return "";
   var parts = t.split(":"); var h = +parts[0], m = parts[1];
@@ -479,7 +480,7 @@ var S = {
   needsName:false,
   spaceCode:null, me:null, meUid:null,
   space:{ categories: DEFAULT_CATEGORIES.slice(), people:[] },
-  places:[], tab:"been", search:"", categoryFilter:null, happyHourNow:false, sortBeen:"top",
+  places:[], tab:"been", search:"", categoryFilter:null, activeFilters:[], sortBeen:"top",
   sheet:null, confirmDeleteId:null, confirmDeleteReviewId:null, toast:null,
   shuffleMode:"new", shuffleCategory:null, shuffleResult:null,
   joinDraft:false, startDraft:false, loadingSpace:false
@@ -721,14 +722,16 @@ function headerHtml(){
     html += '<div class="search-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>'+
       '<input type="search" id="search-input" placeholder="Search places, tags, notes" value="'+escapeHtml(S.search)+'"></div>';
     html += categoryChipsHtml();
-    html += happyHourFilterHtml();
+    html += presetFilterChipsHtml();
   }
   html += '</div>';
   return html;
 }
-function happyHourFilterHtml(){
-  var active = !!S.happyHourNow;
-  return '<button type="button" class="hh-filter-toggle'+(active?" active":"")+'" data-hh-now-filter="1" aria-pressed="'+(active?"true":"false")+'">🍹 Happy hour right now</button>';
+function presetFilterChipsHtml(){
+  return '<div class="chip-row">'+FILTER_PRESETS.map(function(f){
+    var active = S.activeFilters.indexOf(f.key)>-1;
+    return '<button type="button" class="chip'+(active?" active":"")+'" data-filter-key="'+escapeHtml(f.key)+'" aria-pressed="'+(active?"true":"false")+'">'+escapeHtml(f.label)+'</button>';
+  }).join("")+'</div>';
 }
 function categoryChipsHtml(){
   var cats = S.space.categories||[];
@@ -739,10 +742,13 @@ function categoryChipsHtml(){
 }
 function filteredPlaces(status){
   var q = (S.search||"").toLowerCase().trim();
+  var activeFeature = FILTER_PRESETS.filter(function(f){ return f.group==="feature" && S.activeFilters.indexOf(f.key)>-1; });
+  var activeHoods = FILTER_PRESETS.filter(function(f){ return f.group==="neighborhood" && S.activeFilters.indexOf(f.key)>-1; });
   return S.places.filter(function(p){
     if((p.status||"want")!==status) return false;
     if(S.categoryFilter && getCategories(p).indexOf(S.categoryFilter)===-1) return false;
-    if(S.happyHourNow && !isHappyHourNow(p)) return false;
+    if(!activeFeature.every(function(f){ return f.test(p); })) return false;
+    if(activeHoods.length && !activeHoods.some(function(f){ return f.test(p); })) return false;
     if(q){
       var hay = [p.name,p.notes,p.source].concat(getCategories(p)).concat(p.tags||[]).join(" ").toLowerCase();
       if(hay.indexOf(q)===-1) return false;
@@ -772,9 +778,8 @@ function placeCardHtml(p){
     metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;">'+
       (fav?'<img src="'+fav+'" alt="" width="14" height="14" style="border-radius:3px;">':'')+'Menu ↗</a>');
   }
-  var cardHH = getHappyHour(p);
-  var hasHappyHour = cardHH.enabled && DAYS_OF_WEEK.some(function(d){ return cardHH.days[d.key].active; });
-  var hhLiveNow = hasHappyHour && isHappyHourNow(p);
+  var placeHasHappyHour = hasHappyHour(p);
+  var hhLiveNow = placeHasHappyHour && isHappyHourNow(p);
   var html = '<div class="place-card'+(hhLiveNow?" hh-live":"")+'" data-id="'+p.id+'">';
   html += '<div class="place-thumb">'+thumb+'</div><div class="place-main">';
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
@@ -788,9 +793,9 @@ function placeCardHtml(p){
     if(p.notes) html += '<div class="per-person" style="margin-top:6px;"><b style="color:var(--ink);">Want to try:</b> '+escapeHtml(p.notes)+'</div>';
     if(p.source) html += '<div class="per-person" style="margin-top:2px;"><b style="color:var(--ink);">Source:</b> '+escapeHtml(p.source)+'</div>';
   }
-  if(hasHappyHour || (p.tags && p.tags.length)){
+  if(placeHasHappyHour || (p.tags && p.tags.length)){
     html += '<div class="tag-row">'+
-      (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (hasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
+      (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (placeHasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
       '</div>';
   }
@@ -827,8 +832,9 @@ function categoryRank(name){
 }
 function emptyStateHtml(kind){
   var emoji = S.categoryFilter ? categoryEmoji(S.categoryFilter) : (kind==="been" ? "🌮" : "📍");
-  if(S.happyHourNow){
-    return '<div class="empty"><span class="fork">🍹</span><p>No spots have happy hour going on right now. Check back later, or turn off "Happy hour right now" above.</p></div>';
+  if(S.activeFilters.length){
+    var filterLabels = S.activeFilters.map(function(k){ var f=FILTER_PRESETS.filter(function(x){return x.key===k;})[0]; return f?f.label:k; }).join(", ");
+    return '<div class="empty"><span class="fork">🔍</span><p>No spots match '+escapeHtml(filterLabels)+'. Try removing a filter above, or tap + to add one.</p></div>';
   }
   if(S.search){
     return '<div class="empty"><span class="fork">'+emoji+'</span><p>Nothing matches “'+escapeHtml(S.search)+'”'+(S.categoryFilter?' in '+escapeHtml(S.categoryFilter):'')+'. Try a different search, or tap + to add it.</p></div>';
@@ -941,6 +947,12 @@ function locationQueryHint(address, neighborhood){
   if(neighborhood && neighborhood!=="Other") return neighborhood;
   return "";
 }
+var FILTER_PRESETS = [
+  {key:"happyhour", label:"🍹 Happy Hour", group:"feature", test:hasHappyHour},
+  {key:"patio", label:"⛱️ Patio", group:"feature", test:function(p){ return (p.tags||[]).some(function(t){ return /patio/i.test(t); }); }}
+].concat(NEIGHBORHOODS.map(function(n){
+  return {key:"hood:"+n, label:n, group:"neighborhood", test:function(p){ return p.neighborhood===n; }};
+}));
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
     price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
@@ -1213,10 +1225,17 @@ function reviewEditHtml(){
 /* ---------------- Bindings ---------------- */
 function bindShell(){
   var el;
-  document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.search=""; S.shuffleResult=null; render(); }; });
+  document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.activeFilters=[]; S.search=""; S.shuffleResult=null; render(); }; });
   if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); };
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
-  if((el=document.querySelector("[data-hh-now-filter]"))) el.onclick = function(){ S.happyHourNow = !S.happyHourNow; render(); };
+  document.querySelectorAll("[data-filter-key]").forEach(function(b){
+    b.onclick = function(){
+      var k = b.getAttribute("data-filter-key");
+      var idx = S.activeFilters.indexOf(k);
+      if(idx>-1) S.activeFilters.splice(idx,1); else S.activeFilters.push(k);
+      render();
+    };
+  });
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
     el.oninput = function(){
