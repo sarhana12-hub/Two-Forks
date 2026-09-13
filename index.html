@@ -1060,6 +1060,7 @@ function exportingOverlayHtml(){
     '<div class="export-spinner" aria-hidden="true"></div>'+
     '<p style="margin:16px 0 0;font-weight:600;color:var(--ink);">Preparing your PDF…</p>'+
     '<p class="helper-text" style="margin-top:6px;">You\'ll be notified when the print preview is ready.</p>'+
+    '<button type="button" class="btn btn-secondary btn-sm" id="export-cancel-wait" style="margin-top:4px;">Cancel</button>'+
     '</div></div>';
 }
 var exportSafetyTimer = null;
@@ -1080,7 +1081,7 @@ function runExport(ids){
       '</div>';
     var pa = document.getElementById("print-area");
     if(pa) pa.innerHTML = html;
-    exportSafetyTimer = setTimeout(clearExportingState, 8000);
+    exportSafetyTimer = setTimeout(clearExportingState, 60000);
     window.print();
   }, 60);
 }
@@ -1462,6 +1463,10 @@ function bindShell(){
   if((el=document.getElementById("export-go"))) el.onclick = function(){
     var ids = Object.keys(S.exportPicker.selected).filter(function(id){ return S.exportPicker.selected[id]; });
     runExport(ids);
+  };
+  if((el=document.getElementById("export-cancel-wait"))) el.onclick = function(){
+    clearExportingState();
+    showToast("Dismissed — the print preview may still pop up if it finishes on its own");
   };
   if((el=document.getElementById("rename-me"))) el.onclick = function(){
     var name = prompt("Your name", S.me);
