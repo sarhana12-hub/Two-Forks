@@ -946,7 +946,7 @@ function editSheetHtml(p){
       '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1">'+iconClose()+'</button></div>' :
       '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">')+
     '</div></div>';
-  html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by a friend, saw on Reddit, NYT article…"></div>';
+  html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by friend, Reddit, NYT, etc."></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label>Tags</label><div class="tag-input-row"><input type="text" id="f-tag-input" placeholder="e.g. patio, date night"><button class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
     '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
