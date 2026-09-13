@@ -1211,6 +1211,22 @@ function bindCategoryDrag(){
   });
 }
 
+function daysSinceLastVisit(p){
+  var dates = (p.reviews||[]).map(function(r){ return r.date; }).filter(Boolean);
+  if(!dates.length) return 3650; // no logged visit date - treat as long overdue
+  var mostRecent = dates.reduce(function(a,b){ return a>b?a:b; });
+  return Math.max(0, (Date.now() - new Date(mostRecent).getTime()) / 86400000);
+}
+function weightedRandomPick(pool, weightFn){
+  var weights = pool.map(weightFn);
+  var total = weights.reduce(function(a,b){ return a+b; }, 0);
+  var r = Math.random() * total;
+  for(var i=0;i<pool.length;i++){
+    r -= weights[i];
+    if(r<=0) return pool[i];
+  }
+  return pool[pool.length-1];
+}
 function runShuffle(){
   var pool = S.places.filter(function(p){
     if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
@@ -1227,7 +1243,12 @@ function runShuffle(){
   }
   if(!pool.length){ showToast("Nothing to pick from yet"); S.shuffleResult=null; render(); return; }
   var pick, guard=0;
-  do { pick = pool[Math.floor(Math.random()*pool.length)]; guard++; } while(pool.length>1 && S.shuffleResult && pick.id===S.shuffleResult.id && guard<20);
+  do {
+    pick = S.shuffleMode==="favorite"
+      ? weightedRandomPick(pool, function(p){ return 1 + Math.min(daysSinceLastVisit(p)/60, 3); })
+      : pool[Math.floor(Math.random()*pool.length)];
+    guard++;
+  } while(pool.length>1 && S.shuffleResult && pick.id===S.shuffleResult.id && guard<20);
   S.shuffleResult = pick; render();
 }
 
