@@ -78,7 +78,7 @@ a{ color:var(--accent); }
 .onboard{ flex:1; display:flex; flex-direction:column; padding:28px 24px calc(28px + env(safe-area-inset-bottom)); }
 .onboard-hero{ margin-top:8vh; margin-bottom:32px; }
 .onboard-hero .fork{ font-size:40px; line-height:1; margin-bottom:14px; }
-.onboard-hero h1{ font-size:36px; font-weight:600; margin:0 0 10px; color:var(--ink); }
+.onboard-hero h1{ font-size:30px; font-weight:600; margin:0 0 10px; color:var(--ink); }
 .onboard-hero p{ color:var(--ink-soft); font-size:15.5px; line-height:1.5; margin:0; max-width:34ch; }
 .onboard-actions{ display:flex; flex-direction:column; gap:12px; margin-top:auto; }
 .card-panel{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; }
@@ -100,10 +100,10 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .btn-danger{ background:transparent; color:var(--chili); border:1px solid var(--chili-soft); }
 .btn-block{ width:100%; }
 .btn:disabled{ opacity:.5; cursor:default; }
-.btn-sm{ padding:8px 12px; font-size:13.5px; border-radius:9px; }
+.btn-sm{ padding:8px 12px; font-size:14px; border-radius:9px; }
 
 .link-row{ text-align:center; margin-top:6px; }
-.link-btn{ background:none; border:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; font-size:14.5px; }
+.link-btn{ background:none; border:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; font-size:14px; }
 
 .back-row{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
 .icon-btn{ width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--surface);
@@ -112,21 +112,21 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .divider{ display:flex; align-items:center; gap:12px; color:var(--ink-faint); font-size:12.5px; margin:16px 0; }
 .divider::before,.divider::after{ content:""; flex:1; height:1px; background:var(--border); }
 
-.error-text{ color:var(--chili); font-size:13px; margin:-6px 0 12px; line-height:1.4; }
-.err-box{ background:var(--chili-soft); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:14px; }
+.error-text{ color:var(--chili); font-size:12.5px; margin:-6px 0 12px; line-height:1.4; }
+.err-box{ background:var(--chili-soft); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:12.5px; margin-bottom:14px; }
 
 /* ---------- App shell ---------- */
 .header{ position:sticky; top:0; z-index:5; background:var(--bg); padding:16px 18px 10px; display:flex; flex-direction:column; gap:12px; }
 .header-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .brand{ display:flex; align-items:center; gap:8px; }
-.brand .fork{ font-size:20px; }
-.brand span{ font-family:'Fraunces',serif; font-weight:600; font-size:19px; }
+.brand .fork{ font-size:18px; }
+.brand span{ font-family:'Fraunces',serif; font-weight:600; font-size:18px; }
 .people-row{ display:flex; align-items:center; }
 .avatar{ width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-size:11px; font-weight:700; color:#fff; border:2px solid var(--bg); margin-left:-8px; }
 .avatar:first-child{ margin-left:0; }
 .sync-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; }
-.sync-note{ font-size:11.5px; color:var(--ink-faint); display:flex; align-items:center; }
+.sync-note{ font-size:11px; color:var(--ink-faint); display:flex; align-items:center; }
 
 .search-wrap{ position:relative; }
 .search-wrap input{ padding-left:36px; background:var(--surface-2); border-color:transparent; }
@@ -137,7 +137,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .chip-row{ display:flex; gap:8px; overflow-x:auto; padding:2px 18px 4px; margin:0 -18px; scrollbar-width:none; }
 .chip-row::-webkit-scrollbar{ display:none; }
 .chip{ flex:none; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface);
-  font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; white-space:nowrap; }
+  font-size:14px; font-weight:600; color:var(--ink-soft); cursor:pointer; white-space:nowrap; }
 .chip.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
 
 .content{ flex:1; padding:14px 18px calc(96px + env(safe-area-inset-bottom)); overflow-y:auto; }
@@ -148,7 +148,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 
 .empty{ text-align:center; padding:48px 20px; color:var(--ink-soft); }
 .empty .fork{ font-size:34px; display:block; margin-bottom:10px; }
-.empty p{ margin:0 0 16px; font-size:14.5px; line-height:1.5; }
+.empty p{ margin:0 0 16px; font-size:14px; line-height:1.5; }
 
 .place-card{ display:flex; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:14px;
   padding:12px; margin-bottom:10px; cursor:pointer; align-items:flex-start; }
@@ -166,21 +166,21 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .stars svg{ width:13px; height:13px; }
 .rating-line{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12.5px; color:var(--ink-soft); }
 .rating-line b{ color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; }
-.per-person{ font-size:11.5px; color:var(--ink-faint); }
+.per-person{ font-size:11px; color:var(--ink-faint); }
 .tag-row{ margin-top:6px; display:flex; gap:5px; flex-wrap:wrap; }
 .tag-pill{ font-size:11px; background:var(--surface-2); color:var(--ink-soft); padding:2px 8px; border-radius:999px; }
 
 .category-group{ margin-bottom:6px; }
-.category-title{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; font-size:15px;
+.category-title{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; font-size:15.5px;
   margin:18px 0 8px; color:var(--ink); }
-.category-title .count{ color:var(--ink-faint); font-weight:500; font-size:13px; }
+.category-title .count{ color:var(--ink-faint); font-weight:500; font-size:12.5px; }
 
 .want-actions{ display:flex; gap:8px; margin-top:8px; }
 
 .tabbar{ position:sticky; bottom:0; z-index:6; background:var(--surface); border-top:1px solid var(--border);
   display:flex; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); }
 .tabbar button{ flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
-  color:var(--ink-faint); font:inherit; font-size:10.5px; font-weight:600; padding:6px 2px; cursor:pointer; }
+  color:var(--ink-faint); font:inherit; font-size:11px; font-weight:600; padding:6px 2px; cursor:pointer; }
 .tabbar button.active{ color:var(--accent); }
 .tabbar svg{ width:22px; height:22px; }
 
@@ -219,7 +219,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .tag-input-row{ display:flex; gap:8px; }
 .tag-input-row input{ flex:1; }
 .chips-edit{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.chip-edit{ display:flex; align-items:center; gap:6px; background:var(--surface-2); padding:5px 6px 5px 12px; border-radius:999px; font-size:13px; }
+.chip-edit{ display:flex; align-items:center; gap:6px; background:var(--surface-2); padding:5px 6px 5px 12px; border-radius:999px; font-size:12.5px; }
 .chip-edit button{ background:none; border:none; cursor:pointer; color:var(--ink-faint); display:flex; padding:2px; }
 
 .photo-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
@@ -231,17 +231,17 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; cursor:pointer; }
 
 .confirm-box{ background:var(--chili-soft); border:1px solid var(--chili); border-radius:12px; padding:14px; margin-top:12px; }
-.confirm-box p{ margin:0 0 10px; font-size:13.5px; color:var(--ink); }
+.confirm-box p{ margin:0 0 10px; font-size:14px; color:var(--ink); }
 .confirm-box .row{ display:flex; gap:8px; }
 
 .settings-row{ display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid var(--border); gap:12px; }
 .settings-row:last-child{ border-bottom:none; }
-.settings-row .label{ font-size:14.5px; font-weight:600; }
+.settings-row .label{ font-size:14px; font-weight:600; }
 .settings-row .sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
 
 .code-display{ display:flex; align-items:center; justify-content:space-between; background:var(--surface-2); border-radius:12px;
   padding:14px 16px; }
-.code-display .code{ font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; letter-spacing:.04em; }
+.code-display .code{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; letter-spacing:.04em; }
 
 .cat-manage-row{ display:flex; align-items:center; gap:8px; padding:8px 0; }
 .cat-manage-row input{ flex:1; }
@@ -250,10 +250,10 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .shuffle-card{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px 22px; width:100%; margin-top:18px; }
 .shuffle-card .fork{ font-size:30px; }
 .shuffle-card h3{ font-size:22px; margin:10px 0 4px; }
-.shuffle-card .cat{ color:var(--ink-soft); font-size:13.5px; margin-bottom:12px; }
+.shuffle-card .cat{ color:var(--ink-soft); font-size:14px; margin-bottom:12px; }
 
 .toast{ position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom)); transform:translateX(-50%);
-  background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:13.5px; font-weight:600;
+  background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:14px; font-weight:600;
   z-index:30; box-shadow:var(--shadow-lift); max-width:88%; text-align:center; }
 
 .helper-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.5; margin:0 0 14px; }
@@ -517,7 +517,7 @@ function bindAuth(){
 function nameHtml(){
   var suggested = (S.authUser && S.authUser.displayName) || "";
   return '<div class="shell"><div class="onboard">'+
-    '<div class="onboard-hero" style="margin-top:10vh;"><div class="fork">👋</div><h1 style="font-size:28px;">What should we call you?</h1>'+
+    '<div class="onboard-hero" style="margin-top:10vh;"><div class="fork">👋</div><h1 style="font-size:30px;">What should we call you?</h1>'+
     '<p>This is how your ratings show up to whoever you share a list with.</p></div>'+
     '<div class="field"><label for="name-input">Your name</label><input type="text" id="name-input" value="'+escapeHtml(suggested)+'" placeholder="e.g. Sam"></div>'+
     '<button class="btn btn-primary btn-block" id="name-go">Continue</button>'+
@@ -542,7 +542,7 @@ function onboardingHtml(){
   if(S.joinDraft){
     return '<div class="shell"><div class="onboard">'+
       '<div class="back-row"><button class="icon-btn" id="ob-back" aria-label="Back">'+iconBack()+'</button></div>'+
-      '<h2 class="display" style="font-size:24px;margin:0 0 6px;">Join a list</h2>'+
+      '<h2 class="display" style="font-size:26px;margin:0 0 6px;">Join a list</h2>'+
       '<p class="helper-text">Enter the code your partner shared with you.</p>'+
       '<div class="field"><label for="join-code">List code</label><input type="text" id="join-code" class="mono" placeholder="TACO-9K2" autocapitalize="characters" autocomplete="off"></div>'+
       '<button class="btn btn-primary btn-block" id="ob-join-go">Join list</button>'+
@@ -870,7 +870,7 @@ function placeViewHtml(p){
   if(p.coverPhoto) html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
   html += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'+
     '<h2 class="display" style="font-size:26px;margin:0;line-height:1.15;">'+escapeHtml(p.name||"Untitled")+'</h2>'+
-    (avg!=null?'<span class="mono" style="font-size:24px;font-weight:700;color:var(--gold);flex:none;">★ '+avg.toFixed(1)+'</span>':'')+
+    (avg!=null?'<span class="mono" style="font-size:22px;font-weight:700;color:var(--gold);flex:none;">★ '+avg.toFixed(1)+'</span>':'')+
     '</div>';
   html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'+
     '<span class="chip active" style="cursor:default;">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
@@ -888,17 +888,17 @@ function placeViewHtml(p){
     html += '<div class="rating-line" style="margin-bottom:14px;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(per?" · "+per:"")+'</span></div>';
   }
   if(p.address){
-    html += '<div class="field"><label>Location</label><div style="font-size:14.5px;color:var(--ink);">'+escapeHtml(p.address)+'</div>'+
-      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Open in Maps</a></div>';
+    html += '<div class="field"><label>Location</label><div style="font-size:14px;color:var(--ink);">'+escapeHtml(p.address)+'</div>'+
+      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Open in Maps</a></div>';
   }
   if(p.website){
     var siteFav = faviconUrl(p.website);
-    html += '<div class="field"><label>Website</label><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600;">'+
+    html += '<div class="field"><label>Website</label><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;">'+
       (siteFav?'<img src="'+siteFav+'" alt="" width="32" height="32" style="border-radius:8px;">':'')+
       '<span>Open website</span></a></div>';
   }
-  if(p.source) html += '<div class="field"><label>Source</label><div style="font-size:14.5px;color:var(--ink-soft);">'+escapeHtml(p.source)+'</div></div>';
-  if(p.notes) html += '<div class="field"><label>Notes</label><div style="font-size:14.5px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(p.notes)+'</div></div>';
+  if(p.source) html += '<div class="field"><label>Source</label><div style="font-size:14px;color:var(--ink-soft);">'+escapeHtml(p.source)+'</div></div>';
+  if(p.notes) html += '<div class="field"><label>Notes</label><div style="font-size:14px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(p.notes)+'</div></div>';
   html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
   if(!reviews.length){
     html += '<p class="helper-text" style="margin:0 0 10px;">No reviews yet.</p>';
@@ -927,7 +927,7 @@ function editSheetHtml(p){
     (S.sheet.addingCategory ? '<div class="tag-input-row" style="margin-top:8px;"><input type="text" id="f-new-cat" placeholder="New category"><button type="button" class="btn btn-secondary btn-sm" id="f-cat-add">Add</button></div>' : '')+
     '</div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
-  if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
+  if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;">'+iconMap()+' Open in Maps</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
     '<input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
@@ -936,7 +936,7 @@ function editSheetHtml(p){
     '</div></div>';
   if(p.website){
     var siteFav = faviconUrl(p.website);
-    html += '<div style="margin:-8px 0 14px;"><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
+    html += '<div style="margin:-8px 0 14px;"><a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
       (siteFav?'<img src="'+siteFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open website</a></div>';
   }
   html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
@@ -973,7 +973,7 @@ function reviewRowHtml(r){
   var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
   if(S.confirmDeleteReviewId===r.id){
     return '<div class="review-row" style="padding:10px 0;border-bottom:1px solid var(--border);">'+
-      '<div style="font-weight:600;font-size:13.5px;margin-bottom:8px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
+      '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
       '<div class="confirm-box" style="margin-top:0;"><p>Delete this review for everyone on the list? This can\'t be undone.</p>'+
       '<div class="row"><button class="btn btn-secondary btn-block" data-review-del-cancel="'+r.id+'">Cancel</button>'+
       '<button class="btn btn-danger btn-block" data-review-del-confirm="'+r.id+'">Delete</button></div></div>'+
@@ -983,15 +983,15 @@ function reviewRowHtml(r){
     thumb+
     '<div style="flex:1;min-width:0;">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
-        '<div style="font-weight:600;font-size:13.5px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
+        '<div style="font-weight:600;font-size:14px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
         '<div style="display:flex;gap:4px;flex:none;">'+
           '<button class="icon-btn" data-review-edit="'+r.id+'" aria-label="Edit review">'+iconEdit()+'</button>'+
           '<button class="icon-btn" data-review-del="'+r.id+'" aria-label="Delete review">'+iconTrash()+'</button>'+
         '</div>'+
       '</div>'+
-      '<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">'+escapeHtml(r.date||"")+(returnLabel?' · '+returnLabel:'')+'</div>'+
-      (r.dishesLiked?'<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;"><b style="color:var(--ink);">Liked:</b> '+escapeHtml(r.dishesLiked)+'</div>':'')+
-      (r.comments?'<div style="font-size:13px;color:var(--ink-soft);margin-top:2px;">'+escapeHtml(r.comments)+'</div>':'')+
+      '<div style="font-size:12.5px;color:var(--ink-faint);margin-top:2px;">'+escapeHtml(r.date||"")+(returnLabel?' · '+returnLabel:'')+'</div>'+
+      (r.dishesLiked?'<div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;"><b style="color:var(--ink);">Liked:</b> '+escapeHtml(r.dishesLiked)+'</div>':'')+
+      (r.comments?'<div style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">'+escapeHtml(r.comments)+'</div>':'')+
     '</div>'+
   '</div>';
 }
@@ -1009,11 +1009,11 @@ function reviewViewHtml(){
   if(r.photo) html += '<img src="'+r.photo+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'+
     (r.rating?starsHtml(r.rating):'')+
-    '<span style="font-size:13px;color:var(--ink-faint);">'+escapeHtml(r.date||"")+'</span>'+
+    '<span style="font-size:12.5px;color:var(--ink-faint);">'+escapeHtml(r.date||"")+'</span>'+
     '</div>';
-  if(returnLabel) html += '<div class="field"><label>Would go back?</label><div style="font-size:14.5px;">'+returnLabel+'</div></div>';
-  if(r.dishesLiked) html += '<div class="field"><label>Dishes liked</label><div style="font-size:14.5px;">'+escapeHtml(r.dishesLiked)+'</div></div>';
-  if(r.comments) html += '<div class="field"><label>Comments</label><div style="font-size:14.5px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(r.comments)+'</div></div>';
+  if(returnLabel) html += '<div class="field"><label>Would go back?</label><div style="font-size:14px;">'+returnLabel+'</div></div>';
+  if(r.dishesLiked) html += '<div class="field"><label>Dishes liked</label><div style="font-size:14px;">'+escapeHtml(r.dishesLiked)+'</div></div>';
+  if(r.comments) html += '<div class="field"><label>Comments</label><div style="font-size:14px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(r.comments)+'</div></div>';
   html += '</div></div></div>';
   return html;
 }
@@ -1042,7 +1042,7 @@ function reviewEditHtml(){
       '<button class="photo-add" id="review-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="review-photo-file" accept="image/*" style="display:none;">')+
     '</div>';
   if(r.photo){
-    html += '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink);"><input type="checkbox" id="rv-set-cover" '+(S.sheet.reviewSetCover?"checked":"")+' style="width:16px;height:16px;"> Set as this restaurant\'s cover photo</label>';
+    html += '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink);"><input type="checkbox" id="rv-set-cover" '+(S.sheet.reviewSetCover?"checked":"")+' style="width:16px;height:16px;"> Set as this restaurant\'s cover photo</label>';
   }
   html += '</div>';
   html += '</div><div class="sheet-footer"><button class="btn btn-secondary btn-block" id="review-cancel">Cancel</button><button class="btn btn-primary btn-block" id="review-save">Save review</button></div></div></div>';
