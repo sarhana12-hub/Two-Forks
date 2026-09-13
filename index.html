@@ -318,7 +318,7 @@ function hashStr(s){ var h=0; s=s||""; for(var i=0;i<s.length;i++) h=(h*31+s.cha
 function avatarColor(name){ return AVATAR_COLORS[hashStr(name||"?") % AVATAR_COLORS.length]; }
 function initials(name){ name=(name||"?").trim(); if(!name) return "?"; var parts=name.split(/\s+/); return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase(); }
 function mapsUrl(name,address){ var q=[name,address].filter(Boolean).join(" "); return "https://maps.apple.com/?daddr="+encodeURIComponent(q); }
-function webSearchUrl(name,address){ var q=[name,address,"menu"].filter(Boolean).join(" "); return "https://www.google.com/search?q="+encodeURIComponent(q); }
+function webSearchUrl(name,address,suffix){ var q=[name,address,suffix||"menu"].filter(Boolean).join(" "); return "https://www.google.com/search?q="+encodeURIComponent(q); }
 function faviconUrl(website){
   try{ var host = new URL(website).hostname; return "https://www.google.com/s2/favicons?domain="+encodeURIComponent(host)+"&sz=32"; }
   catch(e){ return null; }
@@ -956,7 +956,7 @@ var FILTER_PRESETS = [
 }));
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
-    price:0, patio:false, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+    price:0, patio:false, happyHourMenuUrl:"", notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function blankReview(){
   return { id: uid(), uid: S.meUid, rating:0, dishesLiked:"", comments:"", date: new Date().toISOString().slice(0,10), wouldReturn:null, photo:null, createdAt: new Date().toISOString() };
@@ -1039,6 +1039,11 @@ function placeViewHtml(p){
         return '<div style="font-size:14px;color:var(--ink-soft);'+(isToday?'font-weight:600;color:var(--ink);':'')+'"><b style="color:var(--ink);">'+d.label+':</b> '+escapeHtml(range)+'</div>';
       }).join("")+'</div>';
     }
+    if(p.happyHourMenuUrl){
+      var hhMenuFavView = faviconUrl(p.happyHourMenuUrl);
+      html += '<div style="margin:-6px 0 14px;"><a href="'+escapeHtml(p.happyHourMenuUrl)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
+        (hhMenuFavView?'<img src="'+hhMenuFavView+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open happy hour menu</a></div>';
+    }
   }
   html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
   if(!reviews.length){
@@ -1113,6 +1118,17 @@ function editSheetHtml(p){
       }).join("")+'</div>';
     } else {
       html += '<p class="helper-text" style="margin-top:8px;">Pick at least one day above.</p>';
+    }
+    html += '<div class="field" style="margin-top:14px;"><label for="f-hh-menu">Happy Hour menu link <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
+      '<input type="text" id="f-hh-menu" value="'+escapeHtml(p.happyHourMenuUrl||"")+'" placeholder="https://…">'+
+      '<div style="display:flex;gap:8px;">'+
+      '<button type="button" class="btn btn-secondary btn-sm" id="hh-menu-paste-btn" style="flex:1;">Paste</button>'+
+      '<button type="button" class="btn btn-secondary btn-sm" id="hh-menu-search-btn" style="flex:1;">Search</button>'+
+      '</div></div>';
+    if(p.happyHourMenuUrl){
+      var hhMenuFav = faviconUrl(p.happyHourMenuUrl);
+      html += '<div style="margin:8px 0 0;"><a href="'+escapeHtml(p.happyHourMenuUrl)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+
+        (hhMenuFav?'<img src="'+hhMenuFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open happy hour menu</a></div>';
     }
   }
   html += '</div>';
@@ -1545,6 +1561,30 @@ function bindSheet(){
       }).catch(function(){ showToast("Couldn't read clipboard — paste manually"); });
     };
   }
+  if((el=document.getElementById("hh-menu-search-btn"))){
+    el.onclick = function(){
+      var name = (document.getElementById("f-name")||{}).value || place.name || "";
+      var neighborhoodVal = (document.getElementById("f-neighborhood")||{}).value || place.neighborhood || "";
+      var loc = locationQueryHint(place.address, neighborhoodVal);
+      var cityHint = place.address ? "" : neighborhoodCityHint(neighborhoodVal);
+      var hood = [loc, cityHint].filter(Boolean).join(" ");
+      if(!name.trim()){ showToast("Add a name first"); return; }
+      window.open(webSearchUrl(name, hood, "happy hour menu"), "_blank", "noopener");
+    };
+  }
+  if((el=document.getElementById("hh-menu-paste-btn"))){
+    el.onclick = function(){
+      if(!(navigator.clipboard && navigator.clipboard.readText)){ showToast("Clipboard paste isn't supported here — paste manually"); return; }
+      navigator.clipboard.readText().then(function(text){
+        text = (text||"").trim();
+        if(!text){ showToast("Clipboard is empty"); return; }
+        syncSheetFieldsIntoPlace(place);
+        place.happyHourMenuUrl = text;
+        render();
+        showToast("Pasted");
+      }).catch(function(){ showToast("Couldn't read clipboard — paste manually"); });
+    };
+  }
   if((el=document.getElementById("f-tag-add"))){
     el.onclick = function(){
       var inp = document.getElementById("f-tag-input"); var v = inp.value.trim(); if(!v) return;
@@ -1627,6 +1667,7 @@ function bindSheet(){
     syncSheetFieldsIntoPlace(place);
     if(!place.name || !place.name.trim()){ showToast("Give it a name first"); return; }
     place.website = normalizeUrl(place.website);
+    place.happyHourMenuUrl = normalizeUrl(place.happyHourMenuUrl);
     var data = Object.assign({}, place);
     var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){
@@ -1639,6 +1680,7 @@ function syncSheetFieldsIntoPlace(place){
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-neighborhood"))) place.neighborhood = el.value;
   if((el=document.getElementById("f-website"))) place.website = el.value;
+  if((el=document.getElementById("f-hh-menu"))) place.happyHourMenuUrl = el.value;
   if((el=document.getElementById("f-source"))) place.source = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
   if(place.happyHour && place.happyHour.days){
