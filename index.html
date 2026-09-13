@@ -358,6 +358,26 @@ function getCategories(p){
   if(p.category) return [p.category];
   return [];
 }
+var DAYS_OF_WEEK = [
+  {key:"mon",label:"Mon"},{key:"tue",label:"Tue"},{key:"wed",label:"Wed"},{key:"thu",label:"Thu"},
+  {key:"fri",label:"Fri"},{key:"sat",label:"Sat"},{key:"sun",label:"Sun"}
+];
+function getHappyHour(p){
+  var hh = p.happyHour || {};
+  var days = {};
+  DAYS_OF_WEEK.forEach(function(d){
+    var existing = (hh.days && hh.days[d.key]) || {};
+    days[d.key] = { active: !!existing.active, start: existing.start||"", end: existing.end||"" };
+  });
+  return { enabled: !!hh.enabled, days: days };
+}
+function formatTime12h(t){
+  if(!t) return "";
+  var parts = t.split(":"); var h = +parts[0], m = parts[1];
+  var ampm = h>=12 ? "PM" : "AM";
+  var h12 = h%12; if(h12===0) h12=12;
+  return h12+":"+m+" "+ampm;
+}
 function friendlyAuthError(err){
   var code = err && err.code || "";
   var map = {
@@ -731,7 +751,14 @@ function placeCardHtml(p){
     if(p.notes) html += '<div class="per-person" style="margin-top:6px;"><b style="color:var(--ink);">Want to try:</b> '+escapeHtml(p.notes)+'</div>';
     if(p.source) html += '<div class="per-person" style="margin-top:2px;"><b style="color:var(--ink);">Source:</b> '+escapeHtml(p.source)+'</div>';
   }
-  if(p.tags && p.tags.length) html += '<div class="tag-row">'+p.tags.map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+'</div>';
+  var cardHH = getHappyHour(p);
+  var hasHappyHour = cardHH.enabled && DAYS_OF_WEEK.some(function(d){ return cardHH.days[d.key].active; });
+  if(hasHappyHour || (p.tags && p.tags.length)){
+    html += '<div class="tag-row">'+
+      (hasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : '')+
+      (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
+      '</div>';
+  }
   if((p.status||"want")==="want") html += '<div class="want-actions"><button class="btn btn-secondary btn-sm" data-mark-been="'+p.id+'">'+iconCheckboxQuestion()+' Been here?</button></div>';
   html += '</div></div>';
   return html;
@@ -937,6 +964,17 @@ function placeViewHtml(p){
   }
   if(p.source) html += '<div class="field"><label>Source</label><div style="font-size:14px;color:var(--ink-soft);">'+escapeHtml(p.source)+'</div></div>';
   if(p.notes) html += '<div class="field"><label>Notes</label><div style="font-size:14px;color:var(--ink-soft);white-space:pre-wrap;">'+escapeHtml(p.notes)+'</div></div>';
+  var viewHH = getHappyHour(p);
+  if(viewHH.enabled){
+    var hhDays = DAYS_OF_WEEK.filter(function(d){ return viewHH.days[d.key].active; });
+    if(hhDays.length){
+      html += '<div class="field"><label>Happy Hour</label>'+hhDays.map(function(d){
+        var day = viewHH.days[d.key];
+        var range = (day.start&&day.end) ? (formatTime12h(day.start)+' – '+formatTime12h(day.end)) : 'Hours not set';
+        return '<div style="font-size:14px;color:var(--ink-soft);"><b style="color:var(--ink);">'+d.label+':</b> '+escapeHtml(range)+'</div>';
+      }).join("")+'</div>';
+    }
+  }
   html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
   if(!reviews.length){
     html += '<p class="helper-text" style="margin:0 0 10px;">No reviews yet.</p>';
@@ -982,6 +1020,37 @@ function editSheetHtml(p){
       (siteFav?'<img src="'+siteFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open website</a></div>';
   }
   html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
+  p.happyHour = getHappyHour(p);
+  var hh = p.happyHour;
+  html += '<div class="field"><label>Happy Hour <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
+    '<div class="segment"><button type="button" class="'+(!hh.enabled?"active":"")+'" data-hh-enabled="0">No</button>'+
+    '<button type="button" class="'+(hh.enabled?"active":"")+'" data-hh-enabled="1">Yes</button></div>';
+  if(hh.enabled){
+    html += '<p class="helper-text" style="margin:10px 0 6px;">Which days?</p>';
+    html += '<div class="chips-edit">'+DAYS_OF_WEEK.map(function(d){
+      return '<button type="button" class="chip'+(hh.days[d.key].active?" active":"")+'" data-hh-day-toggle="'+d.key+'">'+d.label+'</button>';
+    }).join("")+'</div>';
+    html += '<p class="helper-text" style="margin:12px 0 6px;">Set hours once, apply to all selected days</p>';
+    html += '<div class="tag-input-row" style="flex-wrap:wrap;">'+
+      '<input type="time" id="hh-bulk-start" style="flex:1;min-width:110px;">'+
+      '<input type="time" id="hh-bulk-end" style="flex:1;min-width:110px;">'+
+      '<button type="button" class="btn btn-secondary btn-sm" id="hh-apply-all">Apply to selected</button>'+
+      '</div>';
+    var activeDays = DAYS_OF_WEEK.filter(function(d){ return hh.days[d.key].active; });
+    if(activeDays.length){
+      html += '<div style="margin-top:12px;">'+activeDays.map(function(d){
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
+          '<span style="width:32px;font-size:13px;font-weight:600;color:var(--ink-soft);flex:none;">'+d.label+'</span>'+
+          '<input type="time" id="hh-start-'+d.key+'" value="'+escapeHtml(hh.days[d.key].start)+'" style="flex:1;">'+
+          '<span style="color:var(--ink-faint);font-size:12px;flex:none;">to</span>'+
+          '<input type="time" id="hh-end-'+d.key+'" value="'+escapeHtml(hh.days[d.key].end)+'" style="flex:1;">'+
+          '</div>';
+      }).join("")+'</div>';
+    } else {
+      html += '<p class="helper-text" style="margin-top:8px;">Pick at least one day above.</p>';
+    }
+  }
+  html += '</div>';
   html += '<div class="field"><label>Cover photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
     (p.coverPhoto ?
       '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1" aria-label="Remove photo">'+iconClose()+'</button></div>' :
@@ -1310,6 +1379,40 @@ function bindSheet(){
 
   document.querySelectorAll("[data-set-status]").forEach(function(b){ b.onclick=function(){ place.status=b.getAttribute("data-set-status"); syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-price]").forEach(function(b){ b.onclick=function(){ var n=+b.getAttribute("data-price"); place.price = place.price===n?0:n; syncSheetFieldsIntoPlace(place); render(); }; });
+  document.querySelectorAll("[data-hh-enabled]").forEach(function(b){
+    b.onclick = function(){
+      syncSheetFieldsIntoPlace(place);
+      place.happyHour.enabled = b.getAttribute("data-hh-enabled")==="1";
+      render();
+    };
+  });
+  document.querySelectorAll("[data-hh-day-toggle]").forEach(function(b){
+    b.onclick = function(){
+      syncSheetFieldsIntoPlace(place);
+      var key = b.getAttribute("data-hh-day-toggle");
+      var day = place.happyHour.days[key];
+      day.active = !day.active;
+      if(day.active && !day.start && !day.end){
+        var bs = (document.getElementById("hh-bulk-start")||{}).value;
+        var be = (document.getElementById("hh-bulk-end")||{}).value;
+        if(bs) day.start = bs;
+        if(be) day.end = be;
+      }
+      render();
+    };
+  });
+  if((el=document.getElementById("hh-apply-all"))){
+    el.onclick = function(){
+      syncSheetFieldsIntoPlace(place);
+      var start = document.getElementById("hh-bulk-start").value;
+      var end = document.getElementById("hh-bulk-end").value;
+      DAYS_OF_WEEK.forEach(function(d){
+        var day = place.happyHour.days[d.key];
+        if(day.active){ day.start = start; day.end = end; }
+      });
+      render();
+    };
+  }
   document.querySelectorAll("[data-cat-toggle]").forEach(function(b){
     b.onclick = function(){
       var c = b.getAttribute("data-cat-toggle");
@@ -1462,6 +1565,14 @@ function syncSheetFieldsIntoPlace(place){
   if((el=document.getElementById("f-website"))) place.website = el.value;
   if((el=document.getElementById("f-source"))) place.source = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
+  if(place.happyHour && place.happyHour.days){
+    DAYS_OF_WEEK.forEach(function(d){
+      var day = place.happyHour.days[d.key];
+      var s, e;
+      if((s=document.getElementById("hh-start-"+d.key))) day.start = s.value;
+      if((e=document.getElementById("hh-end-"+d.key))) day.end = e.value;
+    });
+  }
 }
 function preserveSheetInput(){
   if(!S.sheet || !S.sheet.place) return;
