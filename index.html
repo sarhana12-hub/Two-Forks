@@ -793,9 +793,10 @@ function placeCardHtml(p){
     if(p.notes) html += '<div class="per-person" style="margin-top:6px;"><b style="color:var(--ink);">Want to try:</b> '+escapeHtml(p.notes)+'</div>';
     if(p.source) html += '<div class="per-person" style="margin-top:2px;"><b style="color:var(--ink);">Source:</b> '+escapeHtml(p.source)+'</div>';
   }
-  if(placeHasHappyHour || (p.tags && p.tags.length)){
+  if(placeHasHappyHour || p.patio || (p.tags && p.tags.length)){
     html += '<div class="tag-row">'+
       (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (placeHasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
+      (p.patio ? '<span class="tag-pill">⛱️ Patio</span>' : '')+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
       '</div>';
   }
@@ -949,13 +950,13 @@ function locationQueryHint(address, neighborhood){
 }
 var FILTER_PRESETS = [
   {key:"happyhour", label:"🍹 Happy Hour", group:"feature", test:hasHappyHour},
-  {key:"patio", label:"⛱️ Patio", group:"feature", test:function(p){ return (p.tags||[]).some(function(t){ return /patio/i.test(t); }); }}
+  {key:"patio", label:"⛱️ Patio", group:"feature", test:function(p){ return !!p.patio || (p.tags||[]).some(function(t){ return /patio/i.test(t); }); }}
 ].concat(NEIGHBORHOODS.map(function(n){
   return {key:"hood:"+n, label:n, group:"neighborhood", test:function(p){ return p.neighborhood===n; }};
 }));
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
-    price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
+    price:0, patio:false, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function blankReview(){
   return { id: uid(), uid: S.meUid, rating:0, dishesLiked:"", comments:"", date: new Date().toISOString().slice(0,10), wouldReturn:null, photo:null, createdAt: new Date().toISOString() };
@@ -999,9 +1000,10 @@ function placeViewHtml(p){
     '<span class="chip active" style="cursor:default;">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
     (priceStr?'<span class="price-tag" style="font-size:14px;">'+priceStr+'</span>':'')+
     '</div>';
-  if(placeCats.length || (p.tags&&p.tags.length)){
+  if(placeCats.length || p.patio || (p.tags&&p.tags.length)){
     html += '<div class="tag-row" style="margin-bottom:12px;">'+
       placeCats.map(function(c){return '<span class="tag-pill">'+escapeHtml(c)+'</span>';}).join("")+
+      (p.patio ? '<span class="tag-pill">⛱️ Patio</span>' : '')+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
       '</div>';
   }
@@ -1082,6 +1084,7 @@ function editSheetHtml(p){
       (siteFav?'<img src="'+siteFav+'" alt="" width="16" height="16" style="border-radius:3px;">':"")+'Open website</a></div>';
   }
   html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
+  html += '<div class="field"><label>Patio <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="segment"><button type="button" class="'+(!p.patio?"active":"")+'" data-patio="0">No</button><button type="button" class="'+(p.patio?"active":"")+'" data-patio="1">Yes</button></div></div>';
   p.happyHour = getHappyHour(p);
   var hh = p.happyHour;
   html += '<div class="field"><label>Happy Hour <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
@@ -1449,6 +1452,7 @@ function bindSheet(){
 
   document.querySelectorAll("[data-set-status]").forEach(function(b){ b.onclick=function(){ place.status=b.getAttribute("data-set-status"); syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-price]").forEach(function(b){ b.onclick=function(){ var n=+b.getAttribute("data-price"); place.price = place.price===n?0:n; syncSheetFieldsIntoPlace(place); render(); }; });
+  document.querySelectorAll("[data-patio]").forEach(function(b){ b.onclick=function(){ place.patio = b.getAttribute("data-patio")==="1"; syncSheetFieldsIntoPlace(place); render(); }; });
   document.querySelectorAll("[data-hh-enabled]").forEach(function(b){
     b.onclick = function(){
       syncSheetFieldsIntoPlace(place);
