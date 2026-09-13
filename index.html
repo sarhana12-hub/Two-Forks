@@ -711,7 +711,8 @@ function placeCardHtml(p){
   var metaBits = [];
   var placeCats = getCategories(p);
   if(placeCats.length) metaBits.push(escapeHtml(placeCats.join(", ")));
-  if(p.address) metaBits.push(escapeHtml(p.address));
+  if(p.neighborhood) metaBits.push(escapeHtml(p.neighborhood));
+  else if(p.address) metaBits.push(escapeHtml(p.address));
   if(p.website){
     var fav = faviconUrl(p.website);
     metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;">'+
@@ -864,8 +865,9 @@ function tabbarHtml(){
 }
 
 /* ---------------- Sheet ---------------- */
+var NEIGHBORHOODS = ["Downtown","Eat Street","Mill District","North Loop","Northeast","Uptown","St. Paul","New Haven","Other"];
 function blankPlace(status, category){
-  return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", website:"",
+  return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
     price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function blankReview(){
@@ -921,9 +923,11 @@ function placeViewHtml(p){
     var per = perPersonAverages(p.reviews).map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
     html += '<div class="rating-line" style="margin-bottom:14px;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(per?" · "+per:"")+'</span></div>';
   }
-  if(p.address){
-    html += '<div class="field"><label>Location</label><div style="font-size:14px;color:var(--ink);">'+escapeHtml(p.address)+'</div>'+
-      '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Get Directions</a></div>';
+  if(p.address || p.neighborhood){
+    var locText = [p.address, p.neighborhood].filter(Boolean).join(" · ");
+    html += '<div class="field"><label>Location</label><div style="font-size:14px;color:var(--ink);">'+escapeHtml(locText)+'</div>'+
+      (p.address ? '<a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-top:6px;">'+iconMap()+' Get Directions</a>' : '')+
+      '</div>';
   }
   if(p.website){
     var siteFav = faviconUrl(p.website);
@@ -962,6 +966,10 @@ function editSheetHtml(p){
     '</div>';
   html += '<div class="field"><label for="f-address">Location <span style="text-transform:none;font-weight:400;">(optional)</span></label><input type="text" id="f-address" value="'+escapeHtml(p.address)+'" placeholder="Street, neighborhood, or city"></div>';
   if(p.address) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;">'+iconMap()+' Get Directions</a></div>';
+  html += '<div class="field"><label for="f-neighborhood">Neighborhood <span style="text-transform:none;font-weight:400;">(optional)</span></label><select id="f-neighborhood">'+
+    '<option value=""'+(!p.neighborhood?" selected":"")+'>—</option>'+
+    NEIGHBORHOODS.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(p.neighborhood===n?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+
+    '</select></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
     '<input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
@@ -1450,6 +1458,7 @@ function syncSheetFieldsIntoPlace(place){
   var el;
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-address"))) place.address = el.value;
+  if((el=document.getElementById("f-neighborhood"))) place.neighborhood = el.value;
   if((el=document.getElementById("f-website"))) place.website = el.value;
   if((el=document.getElementById("f-source"))) place.source = el.value;
   if((el=document.getElementById("f-notes"))) place.notes = el.value;
