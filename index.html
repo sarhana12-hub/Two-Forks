@@ -936,6 +936,11 @@ function neighborhoodCityHint(neighborhood){
   if(!neighborhood || NEIGHBORHOODS_NO_CITY_HINT.indexOf(neighborhood)>-1) return "";
   return "Minneapolis";
 }
+function locationQueryHint(address, neighborhood){
+  if(address) return address;
+  if(neighborhood && neighborhood!=="Other") return neighborhood;
+  return "";
+}
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
     price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
@@ -998,7 +1003,7 @@ function placeViewHtml(p){
     html += '<div class="field"><label>Location</label><div style="font-size:14px;color:var(--ink);">'+escapeHtml(locText)+'</div></div>';
   }
   if(p.name && p.name.trim()){
-    html += '<div class="field"><a href="'+mapsUrl(p.name,p.address||p.neighborhood)+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
+    html += '<div class="field"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
   }
   if(p.website){
     var siteFav = faviconUrl(p.website);
@@ -1052,7 +1057,7 @@ function editSheetHtml(p){
     '<option value=""'+(!p.neighborhood?" selected":"")+'>—</option>'+
     NEIGHBORHOODS.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(p.neighborhood===n?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+
     '</select></div>';
-  if(p.name && p.name.trim()) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,p.address||p.neighborhood)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
+  if(p.name && p.name.trim()) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
     '<input type="text" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…">'+
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
@@ -1497,7 +1502,9 @@ function bindSheet(){
     el.onclick = function(){
       var name = (document.getElementById("f-name")||{}).value || place.name || "";
       var neighborhoodVal = (document.getElementById("f-neighborhood")||{}).value || place.neighborhood || "";
-      var hood = [neighborhoodVal || place.address || "", neighborhoodVal ? neighborhoodCityHint(neighborhoodVal) : ""].filter(Boolean).join(" ");
+      var loc = locationQueryHint(place.address, neighborhoodVal);
+      var cityHint = place.address ? "" : neighborhoodCityHint(neighborhoodVal);
+      var hood = [loc, cityHint].filter(Boolean).join(" ");
       if(!name.trim()){ showToast("Add a name first"); return; }
       window.open(webSearchUrl(name, hood), "_blank", "noopener");
     };
