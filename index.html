@@ -18,11 +18,11 @@
   --surface-2: #F1EAD9;
   --ink: #241F1B;
   --ink-soft: #6B6259;
-  --ink-faint: #A79E90;
+  --ink-faint: #756C60;
   --accent: #1F6F5C;
   --accent-strong: #164F41;
   --accent-ink: #FFFFFF;
-  --gold: #B9862C;
+  --gold: #96691E;
   --gold-soft: #F3E3BE;
   --chili: #B23A26;
   --chili-soft: #F6DED7;
@@ -32,14 +32,14 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg: #16130F; --surface: #201B15; --surface-2: #28221A; --ink: #F3EDE2; --ink-soft: #B7AC9C; --ink-faint: #776E60;
+    --bg: #16130F; --surface: #201B15; --surface-2: #28221A; --ink: #F3EDE2; --ink-soft: #B7AC9C; --ink-faint: #918573;
     --accent: #4FBFA0; --accent-strong: #6ED4B7; --accent-ink: #0E1512; --gold: #E8BB63; --gold-soft: #3A2F1B;
     --chili: #E2705C; --chili-soft: #3A211B; --border: #362F24;
     --shadow: 0 8px 24px rgba(0,0,0,0.35); --shadow-lift: 0 14px 36px rgba(0,0,0,0.5);
   }
 }
 :root[data-theme="dark"]{
-  --bg: #16130F; --surface: #201B15; --surface-2: #28221A; --ink: #F3EDE2; --ink-soft: #B7AC9C; --ink-faint: #776E60;
+  --bg: #16130F; --surface: #201B15; --surface-2: #28221A; --ink: #F3EDE2; --ink-soft: #B7AC9C; --ink-faint: #918573;
   --accent: #4FBFA0; --accent-strong: #6ED4B7; --accent-ink: #0E1512; --gold: #E8BB63; --gold-soft: #3A2F1B;
   --chili: #E2705C; --chili-soft: #3A211B; --border: #362F24;
   --shadow: 0 8px 24px rgba(0,0,0,0.35); --shadow-lift: 0 14px 36px rgba(0,0,0,0.5);
@@ -106,7 +106,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .link-btn{ background:none; border:none; color:var(--accent); font:inherit; font-weight:600; cursor:pointer; font-size:14.5px; }
 
 .back-row{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
-.icon-btn{ width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:var(--surface);
+.icon-btn{ width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--surface);
   display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); flex:none; }
 
 .divider{ display:flex; align-items:center; gap:12px; color:var(--ink-faint); font-size:12.5px; margin:16px 0; }
@@ -245,7 +245,6 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 
 .cat-manage-row{ display:flex; align-items:center; gap:8px; padding:8px 0; }
 .cat-manage-row input{ flex:1; }
-.cat-manage-row .icon-btn{ width:32px; height:32px; }
 
 .shuffle-wrap{ display:flex; flex-direction:column; align-items:center; text-align:center; padding-top:8px; }
 .shuffle-card{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px 22px; width:100%; margin-top:18px; }
@@ -542,7 +541,7 @@ function bindName(){
 function onboardingHtml(){
   if(S.joinDraft){
     return '<div class="shell"><div class="onboard">'+
-      '<div class="back-row"><button class="icon-btn" id="ob-back">'+iconBack()+'</button></div>'+
+      '<div class="back-row"><button class="icon-btn" id="ob-back" aria-label="Back">'+iconBack()+'</button></div>'+
       '<h2 class="display" style="font-size:24px;margin:0 0 6px;">Join a list</h2>'+
       '<p class="helper-text">Enter the code your partner shared with you.</p>'+
       '<div class="field"><label for="join-code">List code</label><input type="text" id="join-code" class="mono" placeholder="TACO-9K2" autocapitalize="characters" autocomplete="off"></div>'+
@@ -824,7 +823,7 @@ function settingsTabHtml(){
   html += '<div class="card-panel">';
   html += '<div class="section-heading" style="margin-top:0;">Categories</div>';
   sortCategories(S.space.categories||[]).forEach(function(c){
-    html += '<div class="cat-manage-row"><input type="text" data-cat-edit="'+escapeHtml(c)+'" value="'+escapeHtml(c)+'"><button class="icon-btn" data-cat-del="'+escapeHtml(c)+'">'+iconTrash()+'</button></div>';
+    html += '<div class="cat-manage-row"><input type="text" data-cat-edit="'+escapeHtml(c)+'" value="'+escapeHtml(c)+'"><button class="icon-btn" data-cat-del="'+escapeHtml(c)+'" aria-label="Remove category">'+iconTrash()+'</button></div>';
   });
   html += '<div class="tag-input-row" style="margin-top:10px;"><input type="text" id="new-cat-input" placeholder="New category"><button class="btn btn-secondary" id="new-cat-add">Add</button></div></div>';
   return html;
@@ -865,7 +864,7 @@ function placeViewHtml(p){
   var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
   html += '<div class="sheet-header"><h2>'+escapeHtml(p.name||"Untitled")+'</h2><div style="display:flex;gap:8px;flex:none;">'+
     '<button class="icon-btn" id="sheet-edit-btn" aria-label="Edit">'+iconEdit()+'</button>'+
-    '<button class="icon-btn" id="sheet-close">'+iconClose()+'</button>'+
+    '<button class="icon-btn" id="sheet-close" aria-label="Close">'+iconClose()+'</button>'+
     '</div></div>';
   html += '<div class="sheet-body">';
   if(p.coverPhoto) html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
@@ -914,7 +913,7 @@ function editSheetHtml(p){
   var cats = sortCategories(S.space.categories||[]);
   var isNew = !!p.isNew;
   var html = '<div class="overlay" id="sheet-overlay"><div class="sheet">';
-  html += '<div class="sheet-header"><h2>'+(isNew?"Add a place":"Edit place")+'</h2><button class="icon-btn" id="sheet-close">'+iconClose()+'</button></div><div class="sheet-body">';
+  html += '<div class="sheet-header"><h2>'+(isNew?"Add a place":"Edit place")+'</h2><button class="icon-btn" id="sheet-close" aria-label="Close">'+iconClose()+'</button></div><div class="sheet-body">';
   html += '<div class="segment" style="margin-bottom:16px;"><button class="'+(p.status==="want"?"active":"")+'" data-set-status="want">Want to go</button>'+
     '<button class="'+(p.status==="been"?"active":"")+'" data-set-status="been">Been there</button></div>';
   html += '<div class="field"><label for="f-name">Name</label><input type="text" id="f-name" value="'+escapeHtml(p.name)+'" placeholder="e.g. El Camion"></div>';
@@ -943,13 +942,13 @@ function editSheetHtml(p){
   html += '<div class="field"><label>Price</label><div class="price-select">'+[1,2,3,4].map(function(n){ return '<button class="'+(p.price===n?"active":"")+'" data-price="'+n+'">'+Array(n+1).join("$")+'</button>'; }).join("")+'</div></div>';
   html += '<div class="field"><label>Cover photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
     (p.coverPhoto ?
-      '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1">'+iconClose()+'</button></div>' :
+      '<div class="photo-thumb"><img src="'+p.coverPhoto+'" alt=""><button data-cover-del="1" aria-label="Remove photo">'+iconClose()+'</button></div>' :
       '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">')+
     '</div></div>';
   html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by friend, Reddit, NYT, etc."></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label>Tags</label><div class="tag-input-row"><input type="text" id="f-tag-input" placeholder="e.g. patio, date night"><button class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
-    '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
+    '<div class="chips-edit" id="tag-chips">'+(p.tags||[]).map(function(t,i){ return '<div class="chip-edit">'+escapeHtml(t)+'<button data-tag-del="'+i+'" aria-label="Remove tag">'+iconClose()+'</button></div>'; }).join("")+'</div></div>';
   var reviews = (p.reviews||[]).slice().sort(function(a,b){ return (b.date||b.createdAt||"").localeCompare(a.date||a.createdAt||""); });
   html += '<div class="field"><label>Reviews'+(reviews.length?(' <span style="text-transform:none;font-weight:400;">('+reviews.length+')</span>'):'')+'</label>';
   if(!reviews.length){
@@ -978,8 +977,8 @@ function reviewRowHtml(r){
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'+
         '<div style="font-weight:600;font-size:13.5px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
         '<div style="display:flex;gap:4px;flex:none;">'+
-          '<button class="icon-btn" style="width:28px;height:28px;" data-review-edit="'+r.id+'">'+iconEdit()+'</button>'+
-          '<button class="icon-btn" style="width:28px;height:28px;" data-review-del="'+r.id+'">'+iconTrash()+'</button>'+
+          '<button class="icon-btn" data-review-edit="'+r.id+'" aria-label="Edit review">'+iconEdit()+'</button>'+
+          '<button class="icon-btn" data-review-del="'+r.id+'" aria-label="Delete review">'+iconTrash()+'</button>'+
         '</div>'+
       '</div>'+
       '<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">'+escapeHtml(r.date||"")+(returnLabel?' · '+returnLabel:'')+'</div>'+
@@ -997,7 +996,7 @@ function reviewViewHtml(){
   var html = '<div class="overlay" id="review-overlay" style="z-index:21;"><div class="sheet">';
   html += '<div class="sheet-header"><h2>'+escapeHtml(personName(r.uid))+'\'s review</h2><div style="display:flex;gap:8px;flex:none;">'+
     '<button class="icon-btn" id="review-edit-btn" aria-label="Edit">'+iconEdit()+'</button>'+
-    '<button class="icon-btn" id="review-close">'+iconClose()+'</button>'+
+    '<button class="icon-btn" id="review-close" aria-label="Close">'+iconClose()+'</button>'+
     '</div></div><div class="sheet-body">';
   if(r.photo) html += '<img src="'+r.photo+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'+
@@ -1015,7 +1014,7 @@ function reviewEditHtml(){
   var isNewReview = !S.sheet.reviewEditingId;
   var people = (S.space.people&&S.space.people.length) ? S.space.people : [{uid:S.meUid, name:S.me}];
   var html = '<div class="overlay" id="review-overlay" style="z-index:21;"><div class="sheet">';
-  html += '<div class="sheet-header"><h2>'+(isNewReview?"Add a review":"Edit review")+'</h2><button class="icon-btn" id="review-close">'+iconClose()+'</button></div><div class="sheet-body">';
+  html += '<div class="sheet-header"><h2>'+(isNewReview?"Add a review":"Edit review")+'</h2><button class="icon-btn" id="review-close" aria-label="Close">'+iconClose()+'</button></div><div class="sheet-body">';
   if(people.length>1){
     html += '<div class="field"><label>Who\'s this from?</label><div class="segment">'+people.map(function(person){
       return '<button class="'+(r.uid===person.uid?"active":"")+'" data-review-for="'+person.uid+'">'+escapeHtml(person.name)+'</button>';
