@@ -426,7 +426,7 @@ var S = {
   spaceCode:null, me:null, meUid:null,
   space:{ categories: DEFAULT_CATEGORIES.slice(), people:[] },
   places:[], tab:"been", search:"", categoryFilter:null, sortBeen:"top",
-  sheet:null, confirmDeleteId:null, toast:null,
+  sheet:null, confirmDeleteId:null, confirmDeleteReviewId:null, toast:null,
   shuffleMode:"new", shuffleCategory:null, shuffleResult:null,
   joinDraft:false, startDraft:false, loadingSpace:false
 };
@@ -971,6 +971,14 @@ function reviewRowHtml(r){
   var name = personName(r.uid);
   var thumb = r.photo ? '<div class="photo-thumb" style="width:44px;height:44px;flex:none;"><img src="'+r.photo+'" alt=""></div>' : "";
   var returnLabel = {yes:"Would go back", unsure:"Unsure", no:"Wouldn't go back"}[r.wouldReturn] || "";
+  if(S.confirmDeleteReviewId===r.id){
+    return '<div class="review-row" style="padding:10px 0;border-bottom:1px solid var(--border);">'+
+      '<div style="font-weight:600;font-size:13.5px;margin-bottom:8px;">'+escapeHtml(name)+(r.rating?(' · '+starsHtml(r.rating)):'')+'</div>'+
+      '<div class="confirm-box" style="margin-top:0;"><p>Delete this review for everyone on the list? This can\'t be undone.</p>'+
+      '<div class="row"><button class="btn btn-secondary btn-block" data-review-del-cancel="'+r.id+'">Cancel</button>'+
+      '<button class="btn btn-danger btn-block" data-review-del-confirm="'+r.id+'">Delete</button></div></div>'+
+    '</div>';
+  }
   return '<div class="review-row" data-review-row="'+r.id+'" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;">'+
     thumb+
     '<div style="flex:1;min-width:0;">'+
@@ -1045,7 +1053,7 @@ function reviewEditHtml(){
 function bindShell(){
   var el;
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.search=""; S.shuffleResult=null; render(); }; });
-  if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; render(); };
+  if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); };
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
@@ -1061,7 +1069,7 @@ function bindShell(){
       if(e.target.closest("a")) return;
       var id = card.getAttribute("data-id");
       var p = S.places.filter(function(x){return x.id===id;})[0];
-      if(p){ openPlaceSheet(p); S.confirmDeleteId=null; render(); }
+      if(p){ openPlaceSheet(p); S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); }
     };
   });
   document.querySelectorAll("[data-mark-been]").forEach(function(b){
@@ -1282,8 +1290,23 @@ function bindSheet(){
   document.querySelectorAll("[data-review-del]").forEach(function(b){
     b.onclick = function(e){
       e.stopPropagation();
-      var id = b.getAttribute("data-review-del");
+      S.confirmDeleteReviewId = b.getAttribute("data-review-del");
+      render();
+    };
+  });
+  document.querySelectorAll("[data-review-del-cancel]").forEach(function(b){
+    b.onclick = function(e){
+      e.stopPropagation();
+      S.confirmDeleteReviewId = null;
+      render();
+    };
+  });
+  document.querySelectorAll("[data-review-del-confirm]").forEach(function(b){
+    b.onclick = function(e){
+      e.stopPropagation();
+      var id = b.getAttribute("data-review-del-confirm");
       place.reviews = (place.reviews||[]).filter(function(x){return x.id!==id;});
+      S.confirmDeleteReviewId = null;
       syncSheetFieldsIntoPlace(place);
       persistPlaceQuiet(place, "Review deleted");
     };
@@ -1303,7 +1326,7 @@ function bindSheet(){
     var data = Object.assign({}, place);
     var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){
-      showToast("Saved"); S.sheet=null; S.confirmDeleteId=null; render();
+      showToast("Saved"); S.sheet=null; S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render();
     }).catch(function(){ showToast("Couldn't save — try again"); });
   };
 }
@@ -1320,7 +1343,7 @@ function preserveSheetInput(){
   syncSheetFieldsIntoPlace(S.sheet.place);
   if(S.sheet.reviewDraft) syncReviewFieldsIntoDraft();
 }
-function closeSheet(){ S.sheet=null; S.confirmDeleteId=null; render(); }
+function closeSheet(){ S.sheet=null; S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); }
 function persistPlaceQuiet(place, successMsg){
   var data = Object.assign({}, place);
   var id = data.id; delete data.id; delete data.isNew;
