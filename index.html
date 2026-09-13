@@ -310,7 +310,8 @@ function genCode(){
 function normCode(s){ return (s||"").trim().toUpperCase().replace(/[^A-Z0-9-]/g,""); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,9); }
 function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
-function avatarColor(name){ var h=0; name=name||"?"; for(var i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i))>>>0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+function hashStr(s){ var h=0; s=s||""; for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+function avatarColor(name){ return AVATAR_COLORS[hashStr(name||"?") % AVATAR_COLORS.length]; }
 function initials(name){ name=(name||"?").trim(); if(!name) return "?"; var parts=name.split(/\s+/); return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase(); }
 function mapsUrl(name,address){ var q=[name,address].filter(Boolean).join(" "); return "https://maps.apple.com/?daddr="+encodeURIComponent(q); }
 function webSearchUrl(name,address){ var q=[name,address,"menu"].filter(Boolean).join(" "); return "https://www.google.com/search?q="+encodeURIComponent(q); }
@@ -703,7 +704,7 @@ function tabContentHtml(){
   return "";
 }
 function placeCardHtml(p){
-  var thumb = p.coverPhoto ? '<img src="'+p.coverPhoto+'" alt="">' : "🍽️";
+  var thumb = p.coverPhoto ? '<img src="'+p.coverPhoto+'" alt="">' : defaultCoverEmoji(p);
   var reviews = p.reviews||[];
   var avg = avgRating(reviews);
   var priceStr = p.price ? Array(p.price+1).join("$") : "";
@@ -734,13 +735,28 @@ function placeCardHtml(p){
   html += '</div></div>';
   return html;
 }
-function categoryEmoji(cat){
-  var map = {
-    "tacos":"🌮", "pizza":"🍕", "coffee":"☕", "brunch":"🥞", "burgers":"🍔",
-    "ramen":"🍜", "ice cream":"🍨", "bars & drinks":"🍸",
-    "sushi":"🍣", "indian":"🍛", "thai":"🍜"
-  };
-  return map[(cat||"").trim().toLowerCase()] || "🍽️";
+var CATEGORY_EMOJI_SETS = {
+  "tacos": ["🌮","🫔","🌯"],
+  "pizza": ["🍕","🧀"],
+  "coffee": ["☕","🫘","🥐"],
+  "brunch": ["🥞","🍳"],
+  "burgers": ["🍔","🍟"],
+  "ramen": ["🍜","🍲"],
+  "ice cream": ["🍨","🍦","🍧"],
+  "bars & drinks": ["🍸","🍹","🍺"],
+  "sushi": ["🍣","🍱","🍙"],
+  "indian": ["🍛","🍚"],
+  "thai": ["🍜","🍲"]
+};
+var DEFAULT_EMOJI_SET = ["🍽️","🍴","🥢"];
+function categoryEmojiSet(cat){
+  return CATEGORY_EMOJI_SETS[(cat||"").trim().toLowerCase()] || DEFAULT_EMOJI_SET;
+}
+function categoryEmoji(cat){ return categoryEmojiSet(cat)[0]; }
+function defaultCoverEmoji(p){
+  var cats = getCategories(p);
+  var set = categoryEmojiSet(cats[0]);
+  return set[hashStr(p.id||p.name||"") % set.length];
 }
 function categoryRank(name){
   var idx = (S.space.categories||[]).indexOf(name);
@@ -873,7 +889,11 @@ function placeViewHtml(p){
     '<button class="icon-btn" id="sheet-close" aria-label="Close">'+iconClose()+'</button>'+
     '</div></div>';
   html += '<div class="sheet-body">';
-  if(p.coverPhoto) html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
+  if(p.coverPhoto){
+    html += '<img src="'+p.coverPhoto+'" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;margin-bottom:14px;">';
+  } else {
+    html += '<div style="width:100%;aspect-ratio:16/10;border-radius:14px;margin-bottom:14px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:64px;">'+defaultCoverEmoji(p)+'</div>';
+  }
   html += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;">'+
     '<h2 class="display" style="font-size:26px;margin:0;line-height:1.15;">'+escapeHtml(p.name||"Untitled")+'</h2>'+
     (avg!=null?'<span class="mono" style="font-size:22px;font-weight:700;color:var(--gold);flex:none;">★ '+avg.toFixed(1)+'</span>':'')+
