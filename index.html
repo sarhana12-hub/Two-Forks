@@ -141,6 +141,9 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .chip{ flex:none; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface);
   font-size:14px; font-weight:600; color:var(--ink-soft); cursor:pointer; white-space:nowrap; }
 .chip.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.hh-filter-toggle{ display:inline-flex; align-items:center; gap:6px; margin:8px 0 2px; padding:7px 14px; border-radius:999px;
+  border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:600; color:var(--ink-soft); cursor:pointer; }
+.hh-filter-toggle.active{ background:var(--chili); border-color:var(--chili); color:var(--accent-ink); }
 
 .content{ flex:1; padding:14px 18px calc(96px + env(safe-area-inset-bottom)); overflow-y:auto; }
 
@@ -155,6 +158,7 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .place-card{ display:flex; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:14px;
   padding:12px; margin-bottom:10px; cursor:pointer; align-items:flex-start; }
 .place-card:active{ background:var(--surface-2); }
+.place-card.hh-live{ border-color:var(--chili); box-shadow:0 0 0 1px var(--chili); background:var(--chili-soft); }
 .place-thumb{ width:60px; height:60px; border-radius:10px; background:var(--surface-2); flex:none; overflow:hidden;
   display:flex; align-items:center; justify-content:center; font-size:22px; }
 .place-thumb img{ width:100%; height:100%; object-fit:cover; }
@@ -171,6 +175,9 @@ textarea{ resize:vertical; min-height:70px; font-family:inherit; }
 .per-person{ font-size:11px; color:var(--ink-faint); }
 .tag-row{ margin-top:6px; display:flex; gap:5px; flex-wrap:wrap; }
 .tag-pill{ font-size:11px; background:var(--surface-2); color:var(--ink-soft); padding:2px 8px; border-radius:999px; }
+.tag-pill-live{ background:var(--chili); color:var(--accent-ink); font-weight:700; animation:hhPulse 2.4s ease-in-out infinite; }
+@keyframes hhPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.7; } }
+@media (prefers-reduced-motion: reduce){ .tag-pill-live{ animation:none; } }
 
 .category-group{ margin-bottom:6px; }
 .category-title{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; font-size:15.5px;
@@ -378,6 +385,27 @@ function formatTime12h(t){
   var h12 = h%12; if(h12===0) h12=12;
   return h12+":"+m+" "+ampm;
 }
+var JS_DAY_KEYS = ["sun","mon","tue","wed","thu","fri","sat"];
+function timeToMin(t){ var parts=(t||"").split(":"); return (+parts[0])*60+(+parts[1]); }
+function isHappyHourNow(p, now){
+  var hh = getHappyHour(p);
+  if(!hh.enabled) return false;
+  now = now || new Date();
+  var nowMin = now.getHours()*60 + now.getMinutes();
+  function spans(day, min){
+    if(!day || !day.active || !day.start || !day.end) return false;
+    var s = timeToMin(day.start), e = timeToMin(day.end);
+    if(e<=s) return min>=s || min<e;
+    return min>=s && min<e;
+  }
+  if(spans(hh.days[JS_DAY_KEYS[now.getDay()]], nowMin)) return true;
+  var yesterday = hh.days[JS_DAY_KEYS[(now.getDay()+6)%7]];
+  if(yesterday && yesterday.active && yesterday.start && yesterday.end){
+    var s = timeToMin(yesterday.start), e = timeToMin(yesterday.end);
+    if(e<=s && nowMin<e) return true;
+  }
+  return false;
+}
 function friendlyAuthError(err){
   var code = err && err.code || "";
   var map = {
@@ -451,7 +479,7 @@ var S = {
   needsName:false,
   spaceCode:null, me:null, meUid:null,
   space:{ categories: DEFAULT_CATEGORIES.slice(), people:[] },
-  places:[], tab:"been", search:"", categoryFilter:null, sortBeen:"top",
+  places:[], tab:"been", search:"", categoryFilter:null, happyHourNow:false, sortBeen:"top",
   sheet:null, confirmDeleteId:null, confirmDeleteReviewId:null, toast:null,
   shuffleMode:"new", shuffleCategory:null, shuffleResult:null,
   joinDraft:false, startDraft:false, loadingSpace:false
@@ -693,9 +721,14 @@ function headerHtml(){
     html += '<div class="search-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>'+
       '<input type="search" id="search-input" placeholder="Search places, tags, notes" value="'+escapeHtml(S.search)+'"></div>';
     html += categoryChipsHtml();
+    html += happyHourFilterHtml();
   }
   html += '</div>';
   return html;
+}
+function happyHourFilterHtml(){
+  var active = !!S.happyHourNow;
+  return '<button type="button" class="hh-filter-toggle'+(active?" active":"")+'" data-hh-now-filter="1" aria-pressed="'+(active?"true":"false")+'">🍹 Happy hour right now</button>';
 }
 function categoryChipsHtml(){
   var cats = S.space.categories||[];
@@ -709,6 +742,7 @@ function filteredPlaces(status){
   return S.places.filter(function(p){
     if((p.status||"want")!==status) return false;
     if(S.categoryFilter && getCategories(p).indexOf(S.categoryFilter)===-1) return false;
+    if(S.happyHourNow && !isHappyHourNow(p)) return false;
     if(q){
       var hay = [p.name,p.notes,p.source].concat(getCategories(p)).concat(p.tags||[]).join(" ").toLowerCase();
       if(hay.indexOf(q)===-1) return false;
@@ -738,7 +772,10 @@ function placeCardHtml(p){
     metaBits.push('<a href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;">'+
       (fav?'<img src="'+fav+'" alt="" width="14" height="14" style="border-radius:3px;">':'')+'Menu ↗</a>');
   }
-  var html = '<div class="place-card" data-id="'+p.id+'">';
+  var cardHH = getHappyHour(p);
+  var hasHappyHour = cardHH.enabled && DAYS_OF_WEEK.some(function(d){ return cardHH.days[d.key].active; });
+  var hhLiveNow = hasHappyHour && isHappyHourNow(p);
+  var html = '<div class="place-card'+(hhLiveNow?" hh-live":"")+'" data-id="'+p.id+'">';
   html += '<div class="place-thumb">'+thumb+'</div><div class="place-main">';
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
   html += '<div class="place-meta">'+metaBits.map(function(m,i){return (i>0?'<span class="dot-sep"></span>':'')+m;}).join("")+'</div>';
@@ -751,11 +788,9 @@ function placeCardHtml(p){
     if(p.notes) html += '<div class="per-person" style="margin-top:6px;"><b style="color:var(--ink);">Want to try:</b> '+escapeHtml(p.notes)+'</div>';
     if(p.source) html += '<div class="per-person" style="margin-top:2px;"><b style="color:var(--ink);">Source:</b> '+escapeHtml(p.source)+'</div>';
   }
-  var cardHH = getHappyHour(p);
-  var hasHappyHour = cardHH.enabled && DAYS_OF_WEEK.some(function(d){ return cardHH.days[d.key].active; });
   if(hasHappyHour || (p.tags && p.tags.length)){
     html += '<div class="tag-row">'+
-      (hasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : '')+
+      (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (hasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
       '</div>';
   }
@@ -792,6 +827,9 @@ function categoryRank(name){
 }
 function emptyStateHtml(kind){
   var emoji = S.categoryFilter ? categoryEmoji(S.categoryFilter) : (kind==="been" ? "🌮" : "📍");
+  if(S.happyHourNow){
+    return '<div class="empty"><span class="fork">🍹</span><p>No spots have happy hour going on right now. Check back later, or turn off "Happy hour right now" above.</p></div>';
+  }
   if(S.search){
     return '<div class="empty"><span class="fork">'+emoji+'</span><p>Nothing matches “'+escapeHtml(S.search)+'”'+(S.categoryFilter?' in '+escapeHtml(S.categoryFilter):'')+'. Try a different search, or tap + to add it.</p></div>';
   }
@@ -968,10 +1006,12 @@ function placeViewHtml(p){
   if(viewHH.enabled){
     var hhDays = DAYS_OF_WEEK.filter(function(d){ return viewHH.days[d.key].active; });
     if(hhDays.length){
-      html += '<div class="field"><label>Happy Hour</label>'+hhDays.map(function(d){
+      var viewHHLive = isHappyHourNow(p);
+      html += '<div class="field"><label>Happy Hour'+(viewHHLive?' <span class="tag-pill tag-pill-live" style="text-transform:none;margin-left:6px;">🎉 Now</span>':'')+'</label>'+hhDays.map(function(d){
         var day = viewHH.days[d.key];
         var range = (day.start&&day.end) ? (formatTime12h(day.start)+' – '+formatTime12h(day.end)) : 'Hours not set';
-        return '<div style="font-size:14px;color:var(--ink-soft);"><b style="color:var(--ink);">'+d.label+':</b> '+escapeHtml(range)+'</div>';
+        var isToday = d.key===JS_DAY_KEYS[new Date().getDay()];
+        return '<div style="font-size:14px;color:var(--ink-soft);'+(isToday?'font-weight:600;color:var(--ink);':'')+'"><b style="color:var(--ink);">'+d.label+':</b> '+escapeHtml(range)+'</div>';
       }).join("")+'</div>';
     }
   }
@@ -1166,6 +1206,7 @@ function bindShell(){
   document.querySelectorAll("[data-tab]").forEach(function(b){ b.onclick = function(){ S.tab=b.getAttribute("data-tab"); S.categoryFilter=null; S.search=""; S.shuffleResult=null; render(); }; });
   if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); };
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
+  if((el=document.querySelector("[data-hh-now-filter]"))) el.onclick = function(){ S.happyHourNow = !S.happyHourNow; render(); };
   document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
   if((el=document.getElementById("search-input"))){
     el.oninput = function(){
@@ -1681,6 +1722,13 @@ onAuthStateChanged(auth, function(user){
 });
 
 render();
+
+setInterval(function(){
+  if(S.sheet) return;
+  var ae = document.activeElement;
+  if(ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA" || ae.tagName==="SELECT")) return;
+  if(S.tab==="been" || S.tab==="want") render();
+}, 60000);
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});
