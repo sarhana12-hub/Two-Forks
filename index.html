@@ -931,6 +931,11 @@ function tabbarHtml(){
 
 /* ---------------- Sheet ---------------- */
 var NEIGHBORHOODS = ["Downtown","Eat Street","Mill District","North Loop","Northeast","Uptown","St. Paul","New Haven","Other"];
+var NEIGHBORHOODS_NO_CITY_HINT = ["St. Paul","New Haven","Other"];
+function neighborhoodCityHint(neighborhood){
+  if(!neighborhood || NEIGHBORHOODS_NO_CITY_HINT.indexOf(neighborhood)>-1) return "";
+  return "Minneapolis";
+}
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
     price:0, notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
@@ -1491,7 +1496,8 @@ function bindSheet(){
   if((el=document.getElementById("website-search-btn"))){
     el.onclick = function(){
       var name = (document.getElementById("f-name")||{}).value || place.name || "";
-      var hood = (document.getElementById("f-neighborhood")||{}).value || place.neighborhood || place.address || "";
+      var neighborhoodVal = (document.getElementById("f-neighborhood")||{}).value || place.neighborhood || "";
+      var hood = [neighborhoodVal || place.address || "", neighborhoodVal ? neighborhoodCityHint(neighborhoodVal) : ""].filter(Boolean).join(" ");
       if(!name.trim()){ showToast("Add a name first"); return; }
       window.open(webSearchUrl(name, hood), "_blank", "noopener");
     };
