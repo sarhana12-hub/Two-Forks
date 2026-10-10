@@ -750,7 +750,7 @@ function headerHtml(){
     '<span class="sync-note"><span class="sync-dot" style="background:var(--accent)"></span>Synced</span></div>';
   if(S.tab==="been" || S.tab==="want"){
     html += '<div class="search-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>'+
-      '<input type="search" id="search-input" placeholder="Search places, tags, notes" value="'+escapeHtml(S.search)+'"></div>';
+      '<input type="search" id="search-input" placeholder="Search all places, tags, notes" value="'+escapeHtml(S.search)+'"></div>';
     html += categoryChipsHtml();
     html += presetFilterChipsHtml();
   }
@@ -787,6 +787,7 @@ function filteredPlaces(status){
   });
 }
 function tabContentHtml(){
+  if((S.tab==="been" || S.tab==="want") && (S.search||"").trim()) return searchResultsHtml();
   if(S.tab==="been") return beenTabHtml();
   if(S.tab==="want") return wantTabHtml();
   if(S.tab==="shuffle") return shuffleTabHtml();
@@ -877,11 +878,22 @@ function emptyStateHtml(kind){
   if(kind==="been") return '<div class="empty"><span class="fork">🍽️</span><p>No places yet. Tap + to log the first spot you\'ve tried.</p></div>';
   return '<div class="empty"><span class="fork">📍</span><p>Nothing on your list to try yet. Add a place you have been wanting to check out.</p></div>';
 }
+function sortBeenList(list){
+  if(S.sortBeen==="top") return list.slice().sort(function(a,b){ return (avgRating(b.reviews)||0)-(avgRating(a.reviews)||0); });
+  if(S.sortBeen==="recent") return list.slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
+  return list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+function searchResultsHtml(){
+  var been = sortBeenList(filteredPlaces("been"));
+  var want = filteredPlaces("want").sort(function(a,b){ return a.name.localeCompare(b.name); });
+  if(!been.length && !want.length) return emptyStateHtml(S.tab);
+  function group(title, items){
+    return items.length ? '<div class="category-group"><div class="category-title">'+title+' <span class="count">'+items.length+'</span></div>'+items.map(placeCardHtml).join("")+'</div>' : "";
+  }
+  return group("Been There", been) + group("Want to Go", want);
+}
 function beenTabHtml(){
-  var list = filteredPlaces("been");
-  if(S.sortBeen==="top") list = list.slice().sort(function(a,b){ return (avgRating(b.reviews)||0)-(avgRating(a.reviews)||0); });
-  else if(S.sortBeen==="recent") list = list.slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
-  else list = list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  var list = sortBeenList(filteredPlaces("been"));
   if(!list.length) return emptyStateHtml("been");
   var html = '<div class="chip-row" style="margin-bottom:6px;">'+["top","recent","name"].map(function(s){
     var label = {top:"Highest rated",recent:"Recently added",name:"Name A–Z"}[s];
