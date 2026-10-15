@@ -373,8 +373,6 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 .status-pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
 .hours-list{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; }
 .hours-list .today{ color:var(--ink); font-weight:600; }
-.photo-credit{ font-size:11px; color:var(--ink-faint); margin:-8px 0 12px; text-align:right; }
-.photo-credit a{ color:inherit; }
 .g-rating{ font-size:12px; color:var(--ink-faint); font-weight:500; white-space:nowrap; }
 .travel-line{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); font-weight:500; white-space:nowrap; }
 .travel-part{ display:inline-flex; align-items:center; gap:3px; }
@@ -1116,7 +1114,7 @@ function tabContentHtml(){
   if(S.tab==="settings") return settingsTabHtml();
   return "";
 }
-function coverSrc(p){ return p.coverPhoto || p.googlePhotoUrl || null; }
+function coverSrc(p){ return p.coverPhoto || null; }
 function placeCardHtml(p){
   // Your own photo only: Google bills each display of one of its photos,
   // so they're shown on the detail page (one load per open), never in lists.
@@ -1584,7 +1582,7 @@ var CITY_NAME = "Minneapolis, MN";
 var MAX_LOOKUP_MILES = 40;
 var GOOGLE_CALL_CAP = 30;
 var GOOGLE_STALE_DAYS = 30;
-var PLACE_FIELDS = ["id","displayName","formattedAddress","location","websiteURI","nationalPhoneNumber","regularOpeningHours","priceLevel","rating","userRatingCount","types","photos"];
+var PLACE_FIELDS = ["id","displayName","formattedAddress","location","websiteURI","nationalPhoneNumber","regularOpeningHours","priceLevel","rating","userRatingCount","types"];
 var FOOD_TYPE_RE = /restaurant|cafe|coffee|bar$|^bar_|pub|bakery|food|ice_cream|dessert|meal_|brewery|winery|night_club|diner|deli|tea_house|juice|donut|bagel|sandwich|pizza|steak|seafood|sushi|ramen|taco/;
 var NEIGHBORHOOD_CENTERS = {
   "Mill District": {lat:44.9782, lng:-93.2558, r:0.6},
@@ -1759,14 +1757,7 @@ function placeFromGoogle(gp){
   var lng = loc ? (typeof loc.lng==="function" ? loc.lng() : loc.lng) : null;
   if(lat==null || lng==null) return null;
   if(milesBetween(CITY_CENTER, {lat:lat,lng:lng}) > MAX_LOOKUP_MILES) return null;
-  var photoUrl = null, photoAttribution = null;
-  try{
-    if(gp.photos && gp.photos.length){
-      photoUrl = gp.photos[0].getURI ? gp.photos[0].getURI({maxWidth:900}) : null;
-      var a = gp.photos[0].authorAttributions || [];
-      if(a.length) photoAttribution = {name: a[0].displayName||"", uri: a[0].uri||""};
-    }
-  }catch(e){}
+  var photoUrl = null, photoAttribution = null;   // Google photos aren't used
   var types = gp.types || [];
   return {
     source:"google", placeId: gp.id||null, name: String(gp.displayName||""), address: gp.formattedAddress||"", lat:lat, lng:lng,
@@ -1867,7 +1858,7 @@ function applyLookupToPlace(place, r, opts){
   if(r.phone) place.googlePhone = r.phone;
   if(r.hours) place.googleHours = r.hours;
   if(r.rating!=null){ place.googleRating = r.rating; place.googleRatingCount = r.ratingCount||null; }
-  if(r.photoUrl){ place.googlePhotoUrl = r.photoUrl; place.googlePhotoAttribution = r.photoAttribution||null; }
+  delete place.googlePhotoUrl; delete place.googlePhotoAttribution;
   if(r.types && r.types.length) place.googleTypes = r.types.slice(0,12);
   if(r.placeId) place.googleFetchedAt = new Date().toISOString();
   if(!place.price && r.price) place.price = r.price;
@@ -1899,7 +1890,7 @@ function maybeRefreshGoogleDetails(p){
     if(r.phone) updated.googlePhone = r.phone;
     if(r.hours) updated.googleHours = r.hours;
     if(r.rating!=null){ updated.googleRating = r.rating; updated.googleRatingCount = r.ratingCount||null; }
-    if(r.photoUrl){ updated.googlePhotoUrl = r.photoUrl; updated.googlePhotoAttribution = r.photoAttribution||null; }
+    delete updated.googlePhotoUrl; delete updated.googlePhotoAttribution;
     if(!(updated.website||"").trim() && r.website) updated.website = r.website;
     updated.googleFetchedAt = new Date().toISOString();
     var data = Object.assign({}, updated); var id = data.id; delete data.id; delete data.isNew;
@@ -2238,7 +2229,7 @@ function findSheetHtml(){
     '<div class="input-with-actions"><input type="text" id="find-input" value="'+escapeHtml(f.query||"")+'" placeholder="e.g. Hai Hai" autocomplete="off" autocapitalize="words" enterkeyhint="search">'+
     '<button type="submit" class="btn btn-primary btn-sm" id="find-go" '+(f.busy?"disabled":"")+'>'+(f.busy?'<span class="spinner" aria-hidden="true"></span>':'Find')+'</button></div></div></form>';
   if(f.results && f.results.length){
-    html += '<p class="helper-text" style="margin:0 0 4px;">Tap the right one and the address, website, hours and photo fill in for you.</p>';
+    html += '<p class="helper-text" style="margin:0 0 4px;">Tap the right one and the address, website and hours fill in for you.</p>';
     html += lookupRowsHtml(f.results, "data-pick-result");
   } else if(f.results && !f.results.length){
     html += '<p class="helper-text">Nothing matched “'+escapeHtml(f.query)+'” near Minneapolis. Try the full name, or add it by hand below.</p>';
@@ -2286,11 +2277,7 @@ function placeViewHtml(p){
   html += '<div class="sheet-body">';
   var cover = coverSrc(p);
   if(cover){
-    html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="" onerror="var d=document.createElement(\'div\');d.className=\'hero-emoji\';d.textContent=\''+defaultCoverEmoji(p)+'\';this.replaceWith(d);var c=d.nextElementSibling;if(c&&c.classList.contains(\'photo-credit\'))c.remove();">';
-    if(!p.coverPhoto && p.googlePhotoAttribution && p.googlePhotoAttribution.name){
-      var pa = p.googlePhotoAttribution;
-      html += '<div class="photo-credit">Photo: '+(pa.uri?'<a href="'+escapeHtml(pa.uri)+'" target="_blank" rel="noopener">'+escapeHtml(pa.name)+'</a>':escapeHtml(pa.name))+' · Google</div>';
-    }
+    html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="">';
   } else {
     html += '<div class="hero-emoji" aria-hidden="true">'+defaultCoverEmoji(p)+'</div>';
   }
@@ -2468,7 +2455,7 @@ function editSheetHtml(p){
     (p.coverPhoto ?
       '<div class="photo-thumb"><img src="'+escapeHtml(p.coverPhoto)+'" alt=""><button type="button" data-cover-del="1" aria-label="Remove photo">'+iconClose()+'</button></div>' :
       ('<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">'))+
-    '</div>'+(p.googlePhotoUrl && !p.coverPhoto ? '<p class="helper-text" style="margin:8px 0 0;">Google\'s photo shows on the detail page until you add your own.</p>' : '')+'</div>';
+    '</div></div>';
   html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by friend, Reddit, NYT, etc."></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label for="f-tag-input">Tags</label><div class="input-with-actions"><input type="text" id="f-tag-input" placeholder="e.g. cash only, date night" autocomplete="off" enterkeyhint="done"><button type="button" class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
@@ -3220,6 +3207,7 @@ function bindSheet(){
     place.happyHourMenuUrl = normalizeUrl(place.happyHourMenuUrl);
     place.tags = (place.tags||[]).map(function(t){ return String(t).trim(); }).filter(Boolean);
     mergeLiveReviews(place);
+    delete place.googlePhotoUrl; delete place.googlePhotoAttribution;
     var data = Object.assign({}, place);
     var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){
