@@ -12,6 +12,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Two Forks">
 <meta name="format-detection" content="telephone=no">
+<!-- Send the full page address (not just the site root) with requests, so
+     Google's website restriction on the API key (/Two-Forks/*) can match it.
+     Without this, routing requests arrive as "sarhana12-hub.github.io/" and
+     are refused. -->
+<meta name="referrer" content="no-referrer-when-downgrade">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -1311,8 +1316,12 @@ function settingsTabHtml(){
   html += '<div class="section-heading" style="margin-top:0;">Home</div>';
   if(home && !S.homeEdit){
     html += '<div class="home-line"><span aria-hidden="true">🏠</span><span class="fl-text">'+escapeHtml(home.address||"Home")+'<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Travel times are worked out for Thursday at 6 PM and saved with each place.</div></span><button type="button" class="link-btn" id="home-change-btn" style="padding:0 2px;">Change</button></div>';
+    var rb = guardBlocked("routes");
     if(S.travelPass){
       html += '<p class="helper-text"><span class="spinner" aria-hidden="true"></span> Working out travel times… '+S.travelPass.done+' of '+S.travelPass.total+'</p>';
+    } else if(rb){
+      html += '<div class="err-box" role="status"><b>Travel times are paused.</b> '+escapeHtml(rb.reason)+'. The app won\'t ask Google again on this phone until you tap Try again.</div>';
+      html += '<button type="button" class="btn btn-secondary btn-block" id="travel-retry-btn">Try again'+(needTravel?' ('+needTravel+' place'+(needTravel===1?'':'s')+')':'')+'</button>';
     } else if(needTravel){
       html += '<button type="button" class="btn btn-primary btn-block" id="travel-pass-btn">Calculate travel times for '+needTravel+' place'+(needTravel===1?'':'s')+'</button>';
     } else {
@@ -1330,7 +1339,14 @@ function settingsTabHtml(){
   html += '<div class="section-heading" style="margin-top:0;">Place details</div>';
   html += '<p class="helper-text">'+(missing ? missing+' place'+(missing===1?'':'s')+' on this list '+(missing===1?'has':'have')+' no address, map pin or hours yet. Look each one up and confirm the match.' : 'Every place on this list has an address and map pin.')+'</p>';
   html += '<button type="button" class="btn btn-secondary btn-block" id="backfill-btn" '+(missing?'':'disabled')+'>Find details for '+missing+' place'+(missing===1?'':'s')+'</button>';
-  html += '<p class="attribution" style="text-align:left;margin-top:8px;">Lookups by Google, with OpenStreetMap as a fallback.</p></div>';
+  var lb = guardBlocked("lookups");
+  if(lb){
+    html += '<div class="err-box" role="status" style="margin-top:12px;"><b>Google lookups are paused.</b> '+escapeHtml(lb.reason)+'. Searches use OpenStreetMap until you tap Try again.</div>'+
+      '<button type="button" class="btn btn-secondary btn-block btn-sm" id="lookup-retry-btn">Try Google again</button>';
+  } else {
+    html += '<p class="attribution" style="text-align:left;margin-top:8px;">Lookups by Google, with OpenStreetMap as a fallback.</p>';
+  }
+  html += '</div>';
   html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="section-heading" style="margin-top:0;">Export restaurants</div>';
   html += '<p class="helper-text">Pick some restaurants and turn them into a printable PDF you can send without a link.</p>';
@@ -1583,7 +1599,56 @@ var CATEGORY_TYPE_HINTS = [
   [/^bar$|wine_bar|cocktail|pub|brewery|night_club|^bar_/, "Bars & Drinks"]
 ];
 var googleCalls = 0, googleDisabled = false, gmapsPromise = null;
-window.gm_authFailure = function(){ googleDisabled = true; };
+
+/* ---------------- Google call guard ---------------- */
+// Three layers so a misconfiguration can never turn into a flood of calls:
+//  1. per page load: GOOGLE_CALL_CAP lookups, ROUTES_CALL_CAP routing calls;
+//  2. per phone per day (kept in localStorage, survives reopening):
+//     DAILY_LIMIT below;
+//  3. a refusal from Google (permission denied, not enabled, over quota...)
+//     stops that service at once and blocks it on this phone for BLOCK_HOURS,
+//     until someone taps "Try again" - which gets exactly one attempt.
+var DAILY_LIMIT = { lookups: 60, routes: 150 };
+var BLOCK_HOURS = 12;
+var HARD_GOOGLE_ERROR = /PERMISSION_DENIED|are blocked|API key|not authori[sz]ed|ApiNotActivated|not been used|is disabled|not enabled|REQUEST_DENIED|OVER_QUERY_LIMIT|RESOURCE_EXHAUSTED|quota|billing|RefererNotAllowed|InvalidKey/i;
+function guardDay(){ var d = new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function readGuard(){
+  var g;
+  try{ g = JSON.parse(localStorage.getItem("twoforks:gguard")||"{}") || {}; }catch(e){ g = {}; }
+  if(g.day!==guardDay()){ g = { day: guardDay(), lookups:0, routes:0, blocked: g.blocked||{} }; }
+  g.blocked = g.blocked || {};
+  return g;
+}
+function writeGuard(g){ try{ localStorage.setItem("twoforks:gguard", JSON.stringify(g)); }catch(e){} }
+function guardCount(kind){ var g = readGuard(); g[kind] = (g[kind]||0)+1; writeGuard(g); }
+function guardDailyOk(kind){ return (readGuard()[kind]||0) < DAILY_LIMIT[kind]; }
+function guardBlocked(kind){
+  var g = readGuard(), b = g.blocked[kind];
+  if(!b) return null;
+  if(Date.now() > b.until){ delete g.blocked[kind]; writeGuard(g); return null; }
+  return b;
+}
+function guardBlock(kind, reason){ var g = readGuard(); g.blocked[kind] = { until: Date.now()+BLOCK_HOURS*3600000, reason: reason }; writeGuard(g); }
+function guardUnblock(kind){ var g = readGuard(); delete g.blocked[kind]; writeGuard(g); }
+function googleReason(err){
+  var m = String((err && (err.message||err.code)) || err || "");
+  if(/refer/i.test(m) && /block|not allowed/i.test(m)) return "Google blocked requests from this website for the key";
+  if(/not been used|ApiNotActivated|is disabled|not enabled/i.test(m)) return "that Google service isn't turned on for the key's project";
+  if(/quota|RESOURCE_EXHAUSTED|OVER_QUERY_LIMIT/i.test(m)) return "the Google allowance is used up";
+  if(/billing/i.test(m)) return "Google billing is switched off for the project";
+  if(/PERMISSION_DENIED|REQUEST_DENIED|API key|InvalidKey|not authori/i.test(m)) return "Google refused the key";
+  return "Google didn't respond";
+}
+function noteLookupError(err){
+  if(HARD_GOOGLE_ERROR.test(String((err && (err.message||err.code)) || err || ""))){
+    googleDisabled = true; guardBlock("lookups", googleReason(err));
+  }
+  throw err;
+}
+window.gm_authFailure = function(){
+  googleDisabled = true; routesUnavailable = true;
+  guardBlock("lookups", "Google refused the key"); guardBlock("routes", "Google refused the key");
+};
 
 function milesBetween(a, b){
   if(!a || !b || a.lat==null || b.lat==null) return null;
@@ -1684,7 +1749,7 @@ function loadGoogleMaps(){
   });
   return gmapsPromise;
 }
-function googleBudgetOk(){ return googleCalls < GOOGLE_CALL_CAP; }
+function googleBudgetOk(){ return !googleDisabled && googleCalls < GOOGLE_CALL_CAP && guardDailyOk("lookups") && !guardBlocked("lookups"); }
 function placeFromGoogle(gp){
   if(!gp) return null;
   var loc = gp.location;
@@ -1711,11 +1776,11 @@ function placeFromGoogle(gp){
 function googleSearch(query){
   if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
   return loadGoogleMaps().then(function(maps){
-    googleCalls++;
+    googleCalls++; guardCount("lookups");
     return maps.importLibrary("places").then(function(lib){
       return lib.Place.searchByText({ textQuery: query+", "+CITY_NAME, fields: PLACE_FIELDS, maxResultCount: 3, locationBias: CITY_CENTER });
     });
-  }).then(function(res){
+  }).catch(noteLookupError).then(function(res){
     var out = (res && res.places ? res.places : []).map(placeFromGoogle).filter(Boolean);
     // restaurants, cafes, bars and food first; otherwise keep Google's order
     return out.filter(function(r){ return r.isFood; }).concat(out.filter(function(r){ return !r.isFood; }));
@@ -1724,21 +1789,21 @@ function googleSearch(query){
 function googleFetchById(placeId){
   if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
   return loadGoogleMaps().then(function(maps){
-    googleCalls++;
+    googleCalls++; guardCount("lookups");
     return maps.importLibrary("places").then(function(lib){
       var place = new lib.Place({id: placeId});
       return place.fetchFields({fields: PLACE_FIELDS.filter(function(f){ return f!=="id"; })}).then(function(){ return placeFromGoogle(place); });
     });
-  });
+  }).catch(noteLookupError);
 }
 function googleGeocode(query){
   if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
   return loadGoogleMaps().then(function(maps){
-    googleCalls++;
+    googleCalls++; guardCount("lookups");
     return maps.importLibrary("geocoding").then(function(lib){
       return new lib.Geocoder().geocode({ address: query+", "+CITY_NAME });
     });
-  }).then(function(res){
+  }).catch(noteLookupError).then(function(res){
     return (res && res.results ? res.results : []).slice(0,3).map(function(g){
       var lat = g.geometry.location.lat(), lng = g.geometry.location.lng();
       if(milesBetween(CITY_CENTER, {lat:lat,lng:lng}) > MAX_LOOKUP_MILES) return null;
@@ -1883,7 +1948,7 @@ function nextDinnerTime(){
   d.setDate(d.getDate()+days); d.setHours(18,0,0,0);
   return d;
 }
-function routesBudgetOk(){ return routesCalls < ROUTES_CALL_CAP; }
+function routesBudgetOk(){ return routesCalls < ROUTES_CALL_CAP && guardDailyOk("routes"); }
 // One leg in one mode -> minutes, or null when no route exists. Tries the
 // Routes library first, then the older Distance Matrix service; a rejection
 // from both (library missing, API not enabled, key refused) marks routing
@@ -1911,7 +1976,7 @@ function transitRidesFromSteps(steps){
     if(!td) return;
     var line = td.transitLine || td.transit_line || td.line || {};
     var veh = line.vehicle || {};
-    var kind = vehicleKind(veh.type);
+    var kind = vehicleKind(veh.vehicleType || veh.type);
     rides.push({ kind: kind, line: lineLabel(kind, line.name, line.nameShort || line.shortName || line.short_name) });
   });
   return rides;
@@ -1922,12 +1987,12 @@ function transitRidesFromSteps(steps){
 // Distance Matrix service; a rejection from both (library missing, API not
 // enabled, key refused) marks routing unavailable for this page load.
 function routeMinutes(home, place, mode, when){
-  if(routesUnavailable) return Promise.resolve({min:null, rides:null});
+  if(routesUnavailable || guardBlocked("routes")) return Promise.resolve({min:null, rides:null, error:true});
   if(!routesBudgetOk()) return Promise.reject(new Error("routes_cap"));
   var origin = {lat: home.lat, lng: home.lng}, dest = {lat: place.lat, lng: place.lng};
   return loadGoogleMaps().then(function(maps){
     return maps.importLibrary("routes").then(function(lib){
-      routesCalls++;
+      routesCalls++; guardCount("routes");
       if(lib.Route && typeof lib.Route.computeRoutes==="function"){
         var fields = ["durationMillis","distanceMeters"];
         if(mode==="TRANSIT") fields.push("legs");
@@ -1966,8 +2031,12 @@ function routeMinutes(home, place, mode, when){
     });
   }).catch(function(err){
     if(err && (err.message==="routes_cap")) throw err;
-    if(err && /no_routing_library|google_off|google_load_failed|google_timeout|ApiNotActivated|REQUEST_DENIED|dm_REQUEST_DENIED/.test(String(err.message||err))) routesUnavailable = true;
-    return {min:null, rides:null};
+    var m = String((err && (err.message||err.code)) || err || "");
+    if(HARD_GOOGLE_ERROR.test(m) || /no_routing_library|google_off/.test(m)){
+      routesUnavailable = true;
+      guardBlock("routes", /no_routing_library|google_off/.test(m) ? "Google routing isn't available to this app" : googleReason(err));
+    }
+    return {min:null, rides:null, error:true};
   });
 }
 function computeTravel(place){
@@ -1976,11 +2045,15 @@ function computeTravel(place){
   var out = { v: TRAVEL_VERSION, walk:null, transit:null, transitRides:null, drive:null, homeKey: homeKeyOf(home), placeKey: placeKeyOf(place), computedAt: new Date().toISOString(), basis: "Thursday 6 PM" };
   return routeMinutes(home, place, "WALKING", when).then(function(walk){
     out.walk = walk.min;
+    if(walk.error){ out.failed = true; return out; }          // a failed first call: don't spend two more
     if(walk.min!=null && walk.min <= WALK_ONLY_MAX) return out;
-    return Promise.all([routeMinutes(home, place, "TRANSIT", when), routeMinutes(home, place, "DRIVING", when)]).then(function(r){
-      out.transit = r[0].min; out.transitRides = r[0].rides; out.drive = r[1].min; return out;
+    return routeMinutes(home, place, "TRANSIT", when).then(function(tr){
+      out.transit = tr.min; out.transitRides = tr.rides;
+      if(tr.error && routesUnavailable){ out.failed = true; return out; }
+      return routeMinutes(home, place, "DRIVING", when).then(function(dr){ out.drive = dr.min; if(dr.error) out.failed = out.failed || routesUnavailable; return out; });
     });
   }).then(function(t){
+    if(t.failed) return null;
     if(t.walk==null && t.transit==null && t.drive==null) return null;   // nothing usable: leave the place as it was
     return t;
   });
@@ -1999,23 +2072,28 @@ function computeAndStoreTravel(placeId){
 // the cap so a long list continues on the next open.
 function runTravelPass(force){
   var home = currentHome(); if(!home) return;
+  if(guardBlocked("routes")){ render(); return; }
   var ids = S.places.filter(function(p){ return hasPin(p) && (force || travelNeeded(p)); }).map(function(p){ return p.id; });
   if(!ids.length){ showToast("Travel times are already up to date"); return; }
   S.travelPass = { total: ids.length, done: 0, failed: 0, running: true };
   render();
-  var i = 0;
+  var i = 0, failsInARow = 0;
+  function finish(msg){ S.travelPass = null; render(); showToast(msg); }
   function next(){
     if(!S.travelPass) return;
-    if(i >= ids.length || !routesBudgetOk() || routesUnavailable){
-      S.travelPass.running = false;
-      var msg = routesUnavailable ? "Travel times aren't available right now — Google routing didn't respond" :
-        (!routesBudgetOk() && i < ids.length ? "Paused at the lookup limit — reopen the app to finish the rest" : "Travel times updated for "+S.travelPass.done+" place"+(S.travelPass.done===1?"":"s"));
-      S.travelPass = null; render(); showToast(msg); return;
-    }
+    if(routesUnavailable || guardBlocked("routes")) return finish("Travel times stopped — see Settings for why");
+    if(failsInARow >= 3){ guardBlock("routes", "Google didn't return travel times three times in a row"); return finish("Travel times stopped — see Settings for why"); }
+    if(i >= ids.length) return finish("Travel times updated for "+S.travelPass.done+" place"+(S.travelPass.done===1?"":"s"));
+    if(!guardDailyOk("routes")) return finish("Today's travel-time limit is reached — the rest continue tomorrow");
+    if(!routesBudgetOk()) return finish("Paused — reopen the app to finish the rest");
     var id = ids[i++];
     var p = S.places.filter(function(x){ return x.id===id; })[0];
     var run = force && p ? computeTravel(p).then(function(t){ return t ? store.patchPlace(S.spaceCode, id, {travel:t}).then(function(){ return true; }) : false; }).catch(function(){ return false; }) : computeAndStoreTravel(id);
-    run.then(function(ok){ if(!S.travelPass) return; if(ok) S.travelPass.done++; else S.travelPass.failed++; render(); next(); });
+    run.then(function(ok){
+      if(!S.travelPass) return;
+      if(ok){ S.travelPass.done++; failsInARow = 0; } else { S.travelPass.failed++; failsInARow++; }
+      render(); next();
+    });
   }
   next();
 }
@@ -2533,6 +2611,8 @@ function bindShell(){
   if((el=document.getElementById("home-change-btn"))) el.onclick = function(){ S.homeEdit = true; render(); setTimeout(function(){ var i=document.getElementById("home-input"); if(i){ i.focus(); i.select(); } }, 50); };
   if((el=document.getElementById("home-cancel-btn"))) el.onclick = function(){ S.homeEdit = false; render(); };
   if((el=document.getElementById("travel-pass-btn"))) el.onclick = function(){ runTravelPass(false); };
+  if((el=document.getElementById("travel-retry-btn"))) el.onclick = function(){ guardUnblock("routes"); routesUnavailable = false; runTravelPass(false); };
+  if((el=document.getElementById("lookup-retry-btn"))) el.onclick = function(){ guardUnblock("lookups"); googleDisabled = false; render(); showToast("Google lookups will be tried on your next search"); };
   if((el=document.getElementById("travel-recalc-btn"))) el.onclick = function(){ runTravelPass(true); };
   if((el=document.getElementById("backfill-btn"))) el.onclick = function(){
     var queue = S.places.filter(function(p){ return !hasPin(p); }).sort(function(a,b){ return a.name.localeCompare(b.name); }).map(function(p){ return p.id; });
