@@ -422,7 +422,8 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 <script>
   // Two Forks configuration. googleMapsKey: the "two-forks-web" key from
   // Google Cloud (restricted to this site + Maps JavaScript, Places (New) and
-  // Geocoding). Leave empty to use OpenStreetMap lookups only.
+  // Geocoding). Leave empty and restaurant lookups are off; street
+  // addresses can still be pinned through OpenStreetMap.
   window.TWO_FORKS_CONFIG = Object.assign({ googleMapsKey: "AIzaSyAlhM5hLrkBprKW71CXocDF2k7vel5DrbQ" }, window.TWO_FORKS_CONFIG || {});
 </script>
 <script>try{var t=localStorage.getItem("twoforks:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
@@ -1341,10 +1342,10 @@ function settingsTabHtml(){
   html += '<button type="button" class="btn btn-secondary btn-block" id="backfill-btn" '+(missing?'':'disabled')+'>Find details for '+missing+' place'+(missing===1?'':'s')+'</button>';
   var lb = guardBlocked("lookups");
   if(lb){
-    html += '<div class="err-box" role="status" style="margin-top:12px;"><b>Google lookups are paused.</b> '+escapeHtml(lb.reason)+'. Searches use OpenStreetMap until you tap Try again.</div>'+
+    html += '<div class="err-box" role="status" style="margin-top:12px;"><b>Google lookups are paused.</b> '+escapeHtml(lb.reason)+'. Restaurant searches are off until you tap Try again.</div>'+
       '<button type="button" class="btn btn-secondary btn-block btn-sm" id="lookup-retry-btn">Try Google again</button>';
   } else {
-    html += '<p class="attribution" style="text-align:left;margin-top:8px;">Lookups by Google, with OpenStreetMap as a fallback.</p>';
+    html += '<p class="attribution" style="text-align:left;margin-top:8px;">Restaurant lookups by Google.</p>';
   }
   html += '</div>';
   html += '<div class="card-panel" style="margin-bottom:16px;">';
@@ -1570,7 +1571,7 @@ function applyImportedBackup(data){
   }).catch(function(){ showToast("Import failed — try again"); });
 }
 
-/* ---------------- Place lookups (Google Places -> OpenStreetMap -> Google Geocoder) ---------------- */
+/* ---------------- Place lookups (restaurants: Google only; street addresses: Google, then OpenStreetMap) ---------------- */
 // Google is only ever called from a tap (Find, Locate, the Settings pass,
 // or opening a place whose Google details are >30 days old), never while
 // typing. Every Google call is wrapped so a missing key, a disabled API or an
@@ -1823,17 +1824,27 @@ function nominatimSearch(query){
     }).filter(Boolean);
   });
 }
-// Full chain for "find this restaurant by name".
+// "Find this restaurant by name": Google only. OpenStreetMap used to be a
+// silent fallback here, but its restaurant data has no hours, phone, rating
+// or Google ID, and quietly substituting it hid a broken Google setup. If
+// Google can't answer, the result says so (googleDown) and the person can
+// add the place by hand.
 function lookupPlace(query){
-  return googleSearch(query).catch(function(){ return []; }).then(function(res){
+  function down(){ var r = []; r.googleDown = true; return r; }
+  if(!googleBudgetOk()) return Promise.resolve(down());
+  return googleSearch(query).then(function(res){
     if(res.length) return res;
-    return nominatimSearch(query).catch(function(){ return []; });
-  }).then(function(res){
-    if(res.length) return res;
+    // Nothing by name: Google's geocoder still catches a typed street address.
     return googleGeocode(query).catch(function(){ return []; });
-  });
+  }).catch(function(){ return down(); });
 }
-// Address-only chain for manually entered places: Google Geocoder, then OSM.
+function googleDownText(){
+  var lb = guardBlocked("lookups");
+  return "Google lookups aren't available right now"+(lb ? " ("+lb.reason+")" : "")+". You can add it by hand instead.";
+}
+// Street addresses (home, and places added by hand): Google's geocoder,
+// then OpenStreetMap. An address is just an address and a pin, so the backup
+// is as good as Google here and keeps travel times working if Google isn't.
 function locateAddress(address){
   return googleGeocode(address).catch(function(){ return []; }).then(function(res){
     if(res.length) return res;
@@ -2231,10 +2242,12 @@ function findSheetHtml(){
   if(f.results && f.results.length){
     html += '<p class="helper-text" style="margin:0 0 4px;">Tap the right one and the address, website and hours fill in for you.</p>';
     html += lookupRowsHtml(f.results, "data-pick-result");
+  } else if(f.results && f.results.googleDown){
+    html += '<div class="err-box" role="status">'+escapeHtml(googleDownText())+'</div>';
   } else if(f.results && !f.results.length){
     html += '<p class="helper-text">Nothing matched “'+escapeHtml(f.query)+'” near Minneapolis. Try the full name, or add it by hand below.</p>';
   } else {
-    html += '<p class="helper-text">Type the name and tap Find. Details come from Google, or OpenStreetMap when Google is unavailable.</p>';
+    html += '<p class="helper-text">Type the name and tap Find. Details come from Google.</p>';
   }
   html += '<div class="link-row" style="margin-top:14px;"><button type="button" class="link-btn" id="find-manual-btn">Add it by hand instead</button></div>';
   html += '</div></div></div>';
@@ -2378,7 +2391,7 @@ function editSheetHtml(p){
     html += '<div style="margin:-6px 0 14px;">'+
       '<button type="button" class="btn btn-secondary btn-block" id="lookup-btn" '+(S.sheet.lookupBusy?"disabled":"")+'>'+(S.sheet.lookupBusy?'<span class="spinner" aria-hidden="true"></span> Finding…':'🔎 Find address & website')+'</button>'+
       (S.sheet.lookupResults && S.sheet.lookupResults.length ? lookupRowsHtml(S.sheet.lookupResults, "data-use-result")+'<div class="link-row"><button type="button" class="link-btn" id="lookup-dismiss">None of these</button></div>' :
-        (S.sheet.lookupResults ? '<p class="helper-text" style="margin:8px 0 0;">Nothing matched near Minneapolis. You can add the address by hand below.</p>' : ''))+
+        (S.sheet.lookupResults ? (S.sheet.lookupResults.googleDown ? '<div class="err-box" role="status" style="margin:8px 0 0;">'+escapeHtml(googleDownText())+'</div>' : '<p class="helper-text" style="margin:8px 0 0;">Nothing matched near Minneapolis. You can add the address by hand below.</p>') : ''))+
       '</div>';
     html += '<div class="field"><label for="f-address">Address <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
       '<div class="input-with-actions"><input type="text" id="f-address" value="'+escapeHtml(p.address||"")+'" placeholder="Street address" autocomplete="off" enterkeyhint="done">'+
@@ -2914,12 +2927,8 @@ function backfillLookupCurrent(){
   b.answeredByGoogle = false;
   if(!googleBudgetOk()){ b.capped = true; b.results = null; b.busy = false; render(); return; }
   b.busy = true; b.results = null; render();
-  // A place that already has a pin is here for its Google details, so ask
-  // Google only; a place with no pin gets the full chain (Google, then
-  // OpenStreetMap) so it at least gets located.
-  var search = hasPin(cur)
-    ? googleSearch(cur.name).then(function(res){ b.answeredByGoogle = true; return res; }).catch(function(){ return null; })
-    : googleSearch(cur.name).then(function(res){ b.answeredByGoogle = true; return res.length ? res : lookupPlace(cur.name); }).catch(function(){ return lookupPlace(cur.name); });
+  // Google only: this pass is for Google's details.
+  var search = googleSearch(cur.name).then(function(res){ b.answeredByGoogle = true; return res; }).catch(function(){ return null; });
   search.then(function(res){
     if(!S.backfill || S.backfill!==b) return;
     b.busy = false;
