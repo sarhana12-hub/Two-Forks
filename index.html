@@ -371,6 +371,11 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 .photo-credit{ font-size:11px; color:var(--ink-faint); margin:-8px 0 12px; text-align:right; }
 .photo-credit a{ color:inherit; }
 .g-rating{ font-size:12px; color:var(--ink-faint); font-weight:500; white-space:nowrap; }
+.travel-line{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); font-weight:500; white-space:nowrap; }
+.travel-part{ display:inline-flex; align-items:center; gap:3px; }
+.sr-only{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.home-line{ display:flex; align-items:flex-start; gap:10px; background:var(--surface-2); border-radius:12px; padding:12px 14px; margin-bottom:12px; font-size:14px; }
+.home-line .fl-text{ flex:1; min-width:0; }
 .spinner{ width:18px; height:18px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation:exportSpin .8s linear infinite; display:inline-block; vertical-align:middle; }
 .center-loading{ margin-top:30vh; text-align:center; }
 .center-loading .fork{ font-size:44px; line-height:1; margin-bottom:14px; animation:pulse 1.6s ease-in-out infinite; }
@@ -660,6 +665,7 @@ var store = {
     }, function(){});
   },
   savePlace: function(code, id, data){ return setDoc(doc(dbase,"spaces",code,"places",id), data); },
+  patchPlace: function(code, id, patch){ return updateDoc(doc(dbase,"spaces",code,"places",id), patch); },
   deletePlace: function(code, id){ return deleteDoc(doc(dbase,"spaces",code,"places",id)); },
   getUserProfile: function(theUid){ return getDoc(doc(dbase,"users",theUid)).then(function(s){ return s.exists()?s.data():null; }); },
   saveUserProfile: function(theUid, data){ return setDoc(doc(dbase,"users",theUid), data, {merge:true}); }
@@ -700,7 +706,7 @@ var S = {
   joinDraft:false, startDraft:false, loadingSpace:false,
   authDraft:{email:"", password:""},
   online: navigator.onLine !== false, pendingWrites:false,
-  userLoc:null, nearMe:false, shuffleRadius:0, backfill:null
+  userLoc:null, nearMe:false, shuffleRadius:0, backfill:null, travelPass:null, homeEdit:false, homeBusy:false
 };
 window.addEventListener("online", function(){ S.online = true; render(); });
 window.addEventListener("offline", function(){ S.online = false; render(); });
@@ -1149,6 +1155,8 @@ function placeCardHtml(p){
     if(p.source) html += '<div class="want-note" style="margin-top:2px;"><b>Source:</b> '+escapeHtml(p.source)+'</div>';
     if(dist!=null) html += '<div class="visit-note">'+escapeHtml(formatMiles(dist))+' away</div>';
   }
+  var tl = travelLineHtml(p);
+  if(tl) html += '<div class="visit-note">'+tl+'</div>';
   var st = openStatus(p);
   if(placeHasHappyHour || p.patio || (p.tags && p.tags.length) || st.state==="closed" || st.soon){
     html += '<div class="tag-row">'+
@@ -1256,7 +1264,7 @@ function shuffleTabHtml(){
     '<button class="'+(S.shuffleMode==="favorite"?"active":"")+'" data-shuffle-mode="favorite">Go-to favorite</button></div>';
   html += '<div class="chip-row" style="margin-top:12px;"><button class="chip'+(!S.shuffleCategory?" active":"")+'" data-shuffle-cat="">Any category</button>'+
     cats.map(function(c){ return '<button class="chip'+(S.shuffleCategory===c?" active":"")+'" data-shuffle-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; }).join("")+'</div>';
-  html += '<div class="chip-row" style="margin-top:4px;">'+[[0,"Any distance"],[2,"Within 2 mi"],[5,"Within 5 mi"]].map(function(o){
+  html += '<div class="chip-row" style="margin-top:4px;">'+[[0,"Any distance"],[-1,"🚶 Walkable"],[2,"Within 2 mi"],[5,"Within 5 mi"]].map(function(o){
     return '<button class="chip'+(S.shuffleRadius===o[0]?" active":"")+'" data-shuffle-radius="'+o[0]+'">'+o[1]+'</button>';
   }).join("")+'</div>';
   html += '<p class="helper-text" style="margin:10px 0 0;">Places with known hours are only picked while they\'re open.</p>';
@@ -1296,6 +1304,27 @@ function settingsTabHtml(){
     '<button class="btn btn-secondary btn-sm btn-block" id="copy-app-link">'+iconCopy()+' Copy link</button>'+
     '</div></div>';
 
+  var home = currentHome();
+  var needTravel = home ? S.places.filter(travelNeeded).length : 0;
+  var pinned = S.places.filter(hasPin).length;
+  html += '<div class="card-panel" style="margin-bottom:16px;">';
+  html += '<div class="section-heading" style="margin-top:0;">Home</div>';
+  if(home && !S.homeEdit){
+    html += '<div class="home-line"><span aria-hidden="true">🏠</span><span class="fl-text">'+escapeHtml(home.address||"Home")+'<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Travel times are worked out for Thursday at 6 PM and saved with each place.</div></span><button type="button" class="link-btn" id="home-change-btn" style="padding:0 2px;">Change</button></div>';
+    if(S.travelPass){
+      html += '<p class="helper-text"><span class="spinner" aria-hidden="true"></span> Working out travel times… '+S.travelPass.done+' of '+S.travelPass.total+'</p>';
+    } else if(needTravel){
+      html += '<button type="button" class="btn btn-primary btn-block" id="travel-pass-btn">Calculate travel times for '+needTravel+' place'+(needTravel===1?'':'s')+'</button>';
+    } else {
+      html += '<p class="helper-text" style="margin-bottom:8px;">Travel times are up to date for all '+pinned+' pinned place'+(pinned===1?'':'s')+'.</p>';
+      html += '<button type="button" class="btn btn-secondary btn-block btn-sm" id="travel-recalc-btn" '+(pinned?'':'disabled')+'>Recalculate all</button>';
+    }
+  } else {
+    html += '<p class="helper-text">Set a home address and every place shows how long it takes to walk, ride transit or drive there. One lookup per place, saved until the address changes.</p>';
+    html += '<form class="input-with-actions" id="home-form"><input type="text" id="home-input" value="'+escapeHtml(home?home.address:"")+'" placeholder="Street address" autocomplete="street-address" enterkeyhint="done" aria-label="Home address"><button type="submit" class="btn btn-primary btn-sm" '+(S.homeBusy?'disabled':'')+'>'+(S.homeBusy?'<span class="spinner" aria-hidden="true"></span>':'Set home')+'</button></form>';
+    if(home) html += '<div class="link-row"><button type="button" class="link-btn" id="home-cancel-btn">Keep current home</button></div>';
+  }
+  html += '</div>';
   var missing = S.places.filter(function(p){ return !hasPin(p); }).length;
   html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="section-heading" style="margin-top:0;">Place details</div>';
@@ -1828,6 +1857,153 @@ function placeDistance(p){
 }
 function hasPin(p){ return p && p.lat!=null && p.lng!=null; }
 
+/* ---------------- Travel times from home ---------------- */
+// Walking, transit and driving minutes from the list's home address, worked
+// out once per place (walking first; transit and driving only when the walk
+// is over 20 minutes) for next Thursday at 6 PM, then stored on the place.
+// They are recomputed only when the home address or the place's pin changes,
+// or from the Settings button - never on open and never on a schedule.
+var WALK_ONLY_MAX = 20, WALK_SHOW_MAX = 40, TRANSIT_FIRST_MAX = 30;
+var ROUTES_CALL_CAP = 90;          // separate from the lookup cap: a full pass is up to 3 calls per place
+var routesCalls = 0, routesUnavailable = false;
+function homeKeyOf(h){ return h && h.lat!=null ? (Number(h.lat).toFixed(4)+","+Number(h.lng).toFixed(4)) : null; }
+function placeKeyOf(p){ return hasPin(p) ? (Number(p.lat).toFixed(4)+","+Number(p.lng).toFixed(4)) : null; }
+function currentHome(){ var h = S.space && S.space.home; return (h && h.lat!=null && h.lng!=null) ? h : null; }
+function travelCurrent(p){
+  var home = currentHome(); if(!home || !hasPin(p) || !p.travel) return false;
+  return p.travel.homeKey===homeKeyOf(home) && p.travel.placeKey===placeKeyOf(p);
+}
+function travelNeeded(p){ return !!currentHome() && hasPin(p) && !travelCurrent(p); }
+// Next Thursday at 6:00 PM local time (today, if it's Thursday before 6).
+function nextDinnerTime(){
+  var d = new Date(); d.setSeconds(0,0);
+  var days = (4 - d.getDay() + 7) % 7;
+  if(days===0 && (d.getHours()>18 || (d.getHours()===18 && d.getMinutes()>0))) days = 7;
+  d.setDate(d.getDate()+days); d.setHours(18,0,0,0);
+  return d;
+}
+function routesBudgetOk(){ return routesCalls < ROUTES_CALL_CAP; }
+// One leg in one mode -> minutes, or null when no route exists. Tries the
+// Routes library first, then the older Distance Matrix service; a rejection
+// from both (library missing, API not enabled, key refused) marks routing
+// unavailable for this page load so nothing else keeps retrying.
+function routeMinutes(home, place, mode, when){
+  if(routesUnavailable) return Promise.resolve(null);
+  if(!routesBudgetOk()) return Promise.reject(new Error("routes_cap"));
+  var origin = {lat: home.lat, lng: home.lng}, dest = {lat: place.lat, lng: place.lng};
+  return loadGoogleMaps().then(function(maps){
+    return maps.importLibrary("routes").then(function(lib){
+      routesCalls++;
+      if(lib.Route && typeof lib.Route.computeRoutes==="function"){
+        var req = { origin: origin, destination: dest, travelMode: mode, fields: ["durationMillis","distanceMeters"] };
+        if(mode==="DRIVING"){ req.routingPreference = "TRAFFIC_AWARE"; req.departureTime = when; }
+        if(mode==="TRANSIT"){ req.departureTime = when; }
+        return lib.Route.computeRoutes(req).then(function(res){
+          var r = res && res.routes && res.routes[0];
+          if(!r) return null;
+          var ms = typeof r.durationMillis==="number" ? r.durationMillis : (r.duration && r.duration.milliseconds);
+          return ms==null ? null : Math.max(1, Math.round(ms/60000));
+        });
+      }
+      if(lib.DistanceMatrixService){
+        return new Promise(function(resolve, reject){
+          var opts = { origins:[origin], destinations:[dest], travelMode: mode };
+          if(mode==="DRIVING") opts.drivingOptions = { departureTime: when };
+          if(mode==="TRANSIT") opts.transitOptions = { departureTime: when };
+          new lib.DistanceMatrixService().getDistanceMatrix(opts, function(res, status){
+            if(status!=="OK" || !res || !res.rows || !res.rows[0]) return reject(new Error("dm_"+status));
+            var el = res.rows[0].elements[0];
+            if(!el || el.status!=="OK"){ resolve(null); return; }
+            var secs = (el.duration_in_traffic || el.duration || {}).value;
+            resolve(secs==null ? null : Math.max(1, Math.round(secs/60)));
+          });
+        });
+      }
+      throw new Error("no_routing_library");
+    });
+  }).catch(function(err){
+    if(err && (err.message==="routes_cap")) throw err;
+    if(err && /no_routing_library|google_off|google_load_failed|google_timeout|ApiNotActivated|REQUEST_DENIED|dm_REQUEST_DENIED/.test(String(err.message||err))) routesUnavailable = true;
+    return null;
+  });
+}
+function computeTravel(place){
+  var home = currentHome(); if(!home || !hasPin(place)) return Promise.resolve(null);
+  var when = nextDinnerTime();
+  var out = { walk:null, transit:null, drive:null, homeKey: homeKeyOf(home), placeKey: placeKeyOf(place), computedAt: new Date().toISOString(), basis: "Thursday 6 PM" };
+  return routeMinutes(home, place, "WALKING", when).then(function(walk){
+    out.walk = walk;
+    if(walk!=null && walk <= WALK_ONLY_MAX) return out;
+    return Promise.all([routeMinutes(home, place, "TRANSIT", when), routeMinutes(home, place, "DRIVING", when)]).then(function(r){
+      out.transit = r[0]; out.drive = r[1]; return out;
+    });
+  }).then(function(t){
+    if(t.walk==null && t.transit==null && t.drive==null) return null;   // nothing usable: leave the place as it was
+    return t;
+  });
+}
+var travelInFlight = {};
+function computeAndStoreTravel(placeId){
+  var p = S.places.filter(function(x){ return x.id===placeId; })[0];
+  if(!p || travelInFlight[placeId] || !travelNeeded(p) || !S.online) return Promise.resolve(false);
+  travelInFlight[placeId] = true;
+  return computeTravel(p).then(function(t){
+    if(!t) return false;
+    return store.patchPlace(S.spaceCode, placeId, {travel: t}).then(function(){ return true; });
+  }).catch(function(){ return false; }).then(function(ok){ delete travelInFlight[placeId]; return ok; });
+}
+// Settings pass: every place that needs it, one after another, stopping at
+// the cap so a long list continues on the next open.
+function runTravelPass(force){
+  var home = currentHome(); if(!home) return;
+  var ids = S.places.filter(function(p){ return hasPin(p) && (force || travelNeeded(p)); }).map(function(p){ return p.id; });
+  if(!ids.length){ showToast("Travel times are already up to date"); return; }
+  S.travelPass = { total: ids.length, done: 0, failed: 0, running: true };
+  render();
+  var i = 0;
+  function next(){
+    if(!S.travelPass) return;
+    if(i >= ids.length || !routesBudgetOk() || routesUnavailable){
+      S.travelPass.running = false;
+      var msg = routesUnavailable ? "Travel times aren't available right now — Google routing didn't respond" :
+        (!routesBudgetOk() && i < ids.length ? "Paused at the lookup limit — reopen the app to finish the rest" : "Travel times updated for "+S.travelPass.done+" place"+(S.travelPass.done===1?"":"s"));
+      S.travelPass = null; render(); showToast(msg); return;
+    }
+    var id = ids[i++];
+    var p = S.places.filter(function(x){ return x.id===id; })[0];
+    var run = force && p ? computeTravel(p).then(function(t){ return t ? store.patchPlace(S.spaceCode, id, {travel:t}).then(function(){ return true; }) : false; }).catch(function(){ return false; }) : computeAndStoreTravel(id);
+    run.then(function(ok){ if(!S.travelPass) return; if(ok) S.travelPass.done++; else S.travelPass.failed++; render(); next(); });
+  }
+  next();
+}
+// Display, per the house rules:
+//  walk <= 20            -> walk only
+//  20 < walk <= 40       -> walk, transit, drive
+//  walk > 40 (or none)   -> transit and drive, transit first unless it's 30+ min
+// plus: transit slower than walking is hidden; a missing mode is skipped.
+function travelParts(p){
+  var t = p.travel; if(!t) return [];
+  var walk = t.walk, transit = t.transit, drive = t.drive;
+  if(transit!=null && walk!=null && transit >= walk) transit = null;
+  var parts = [];
+  function add(mode, min){ if(min!=null) parts.push({mode:mode, min:min}); }
+  if(walk!=null && walk <= WALK_ONLY_MAX){ add("walk", walk); return parts; }
+  if(walk!=null && walk <= WALK_SHOW_MAX){ add("walk", walk); add("transit", transit); add("drive", drive); return parts; }
+  if(transit!=null && transit < TRANSIT_FIRST_MAX){ add("transit", transit); add("drive", drive); }
+  else { add("drive", drive); add("transit", transit); }
+  if(!parts.length && walk!=null) add("walk", walk);
+  return parts;
+}
+var TRAVEL_ICON = { walk:"🚶", transit:"🚌", drive:"🚗" };
+var TRAVEL_WORD = { walk:"Walk", transit:"Transit", drive:"Drive" };
+function travelLineHtml(p){
+  var parts = travelParts(p); if(!parts.length) return "";
+  return '<span class="travel-line" title="From home, '+escapeHtml((p.travel&&p.travel.basis)||"")+'">'+parts.map(function(x, i){
+    return '<span class="travel-part"><span aria-hidden="true">'+TRAVEL_ICON[x.mode]+'</span><span class="sr-only">'+TRAVEL_WORD[x.mode]+' </span>'+x.min+(i===parts.length-1?' min':'')+'</span>';
+  }).join('<span class="dot-sep"></span>')+'</span>';
+}
+function isWalkable(p){ return !!(p.travel && p.travel.walk!=null && p.travel.walk <= WALK_ONLY_MAX); }
+
 /* ---------------- Sheet ---------------- */
 var NEIGHBORHOODS = ["Downtown","Eat Street","Mill District","North Loop","Northeast","Uptown","St. Paul","New Haven","Other"];
 var NEIGHBORHOODS_NO_CITY_HINT = ["St. Paul","New Haven","Other"];
@@ -1842,7 +2018,8 @@ function locationQueryHint(address, neighborhood){
 }
 var FILTER_PRESETS = [
   {key:"happyhour", label:"🍹 Happy Hour", group:"feature", test:hasHappyHour},
-  {key:"patio", label:"⛱️ Patio", group:"feature", test:function(p){ return !!p.patio || (p.tags||[]).some(function(t){ return /patio/i.test(t); }); }}
+  {key:"patio", label:"⛱️ Patio", group:"feature", test:function(p){ return !!p.patio || (p.tags||[]).some(function(t){ return /patio/i.test(t); }); }},
+  {key:"walkable", label:"🚶 Walkable", group:"feature", test:isWalkable}
 ].concat(NEIGHBORHOODS.map(function(n){
   return {key:"hood:"+n, label:n, group:"neighborhood", test:function(p){ return p.neighborhood===n; }};
 }));
@@ -2011,6 +2188,11 @@ function placeViewHtml(p){
     actionLinks.push('<a class="btn btn-secondary btn-sm" href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="text-decoration:none;">'+(siteFav?'<img src="'+escapeHtml(siteFav)+'" alt="" width="16" height="16" style="border-radius:4px;">':'')+' Website</a>');
   }
   if(actionLinks.length) html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'+actionLinks.join("")+'</div>';
+  var tparts = travelParts(p);
+  if(tparts.length){
+    html += '<div class="field"><label>From home</label><div class="detail-text">'+tparts.map(function(x){ return TRAVEL_ICON[x.mode]+' '+TRAVEL_WORD[x.mode]+' '+x.min+' min'; }).join(' · ')+'</div>'+
+      '<div class="attribution" style="text-align:left;">'+escapeHtml((p.travel&&p.travel.basis)||"")+' estimates from Google'+(travelNeeded(p)?' · will update':'')+'</div></div>';
+  }
   if(p.neighborhood || p.address){
     html += '<div class="field"><label>Location</label><div class="detail-text">'+escapeHtml(p.address||"")+(p.address && p.neighborhood ? '<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);">'+escapeHtml(p.neighborhood)+'</div>' : escapeHtml(p.neighborhood||""))+'</div></div>';
   }
@@ -2267,6 +2449,27 @@ function bindShell(){
     }
     S.nearMe = on; render();
   }; });
+  if((el=document.getElementById("home-form"))) el.onsubmit = function(e){
+    e.preventDefault();
+    var addr = (document.getElementById("home-input").value||"").trim();
+    if(!addr){ showToast("Type your home address first"); return; }
+    S.homeBusy = true; render();
+    locateAddress(addr).then(function(res){
+      S.homeBusy = false;
+      if(!res.length){ render(); showToast("Couldn't find that address — check it and try again"); return; }
+      var r = res[0];
+      var home = { address: r.address || addr, lat: r.lat, lng: r.lng, setBy: S.meUid, setAt: new Date().toISOString() };
+      return store.updateSpace(S.spaceCode, {home: home}).then(function(){
+        S.space.home = home; S.homeEdit = false; render();
+        showToast("Home set");
+        runTravelPass(false);
+      });
+    }).catch(function(){ S.homeBusy = false; render(); showToast("Couldn't save home — try again"); });
+  };
+  if((el=document.getElementById("home-change-btn"))) el.onclick = function(){ S.homeEdit = true; render(); setTimeout(function(){ var i=document.getElementById("home-input"); if(i){ i.focus(); i.select(); } }, 50); };
+  if((el=document.getElementById("home-cancel-btn"))) el.onclick = function(){ S.homeEdit = false; render(); };
+  if((el=document.getElementById("travel-pass-btn"))) el.onclick = function(){ runTravelPass(false); };
+  if((el=document.getElementById("travel-recalc-btn"))) el.onclick = function(){ runTravelPass(true); };
   if((el=document.getElementById("backfill-btn"))) el.onclick = function(){
     var queue = S.places.filter(function(p){ return !hasPin(p); }).sort(function(a,b){ return a.name.localeCompare(b.name); }).map(function(p){ return p.id; });
     if(!queue.length) return;
@@ -2284,7 +2487,7 @@ function bindShell(){
     if(!r || !live){ backfillAdvance(); return; }
     var updated = applyLookupToPlace(Object.assign({}, live), r, {takeName:false});
     var data = Object.assign({}, updated); var id = data.id; delete data.id; delete data.isNew;
-    store.savePlace(S.spaceCode, id, data).catch(function(){ showToast("Couldn't save that — try again"); });
+    store.savePlace(S.spaceCode, id, data).then(function(){ setTimeout(function(){ computeAndStoreTravel(id); }, 50); }).catch(function(){ showToast("Couldn't save that — try again"); });
     S.backfill.done++;
     backfillAdvance();
   }; });
@@ -2527,14 +2730,15 @@ function weightedRandomPick(pool, weightFn){
   return pool[pool.length-1];
 }
 function runShuffle(){
-  if(S.shuffleRadius && !S.userLoc){
+  if(S.shuffleRadius > 0 && !S.userLoc){
     requestLocation().then(function(){ runShuffle(); }).catch(function(){ showToast("Couldn't get your location — showing any distance"); S.shuffleRadius=0; runShuffle(); });
     return;
   }
   var pool = S.places.filter(function(p){
     if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
     if(openStatus(p).state==="closed") return false;
-    if(S.shuffleRadius){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
+    if(S.shuffleRadius===-1 && !isWalkable(p)) return false;
+    if(S.shuffleRadius > 0){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
     if(S.shuffleMode==="new") return (p.status||"want")==="want";
     if((p.status||"want")!=="been") return false;
     var avg = avgRating(p.reviews);
@@ -2544,11 +2748,12 @@ function runShuffle(){
     pool = S.places.filter(function(p){
       if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
       if(openStatus(p).state==="closed") return false;
-      if(S.shuffleRadius){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
+      if(S.shuffleRadius===-1 && !isWalkable(p)) return false;
+      if(S.shuffleRadius > 0){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
       return S.shuffleMode==="new" ? (p.status||"want")==="want" : (p.status||"want")==="been";
     });
   }
-  if(!pool.length){ showToast(S.shuffleRadius ? "Nothing open within "+S.shuffleRadius+" miles right now" : "Nothing open to pick from right now"); S.shuffleResult=null; render(); return; }
+  if(!pool.length){ showToast(S.shuffleRadius===-1 ? "Nothing walkable is open right now" : (S.shuffleRadius ? "Nothing open within "+S.shuffleRadius+" miles right now" : "Nothing open to pick from right now")); S.shuffleResult=null; render(); return; }
   var pick, guard=0;
   do {
     pick = S.shuffleMode==="favorite"
@@ -2854,6 +3059,7 @@ function bindSheet(){
     var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){
       showToast("Saved"); S.sheet=null; S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render();
+      setTimeout(function(){ computeAndStoreTravel(id); }, 50);
     }).catch(function(){ showToast("Couldn't save — try again"); });
   };
 }
