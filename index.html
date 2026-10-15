@@ -348,6 +348,30 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 .toast button{ background:none; border:none; font:inherit; font-weight:700; font-size:14px; color:var(--toast-action); padding:0; cursor:pointer; flex:none; }
 
 .helper-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.5; margin:0 0 14px; }
+.lookup-results{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.lookup-row{ display:flex; gap:12px; align-items:flex-start; text-align:left; width:100%; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; cursor:pointer; font:inherit; color:var(--ink); transition:background .15s ease, transform .12s ease; }
+.lookup-row:active{ background:var(--surface-2); transform:scale(.985); }
+.lookup-row .lr-name{ font-weight:600; font-size:15px; }
+.lookup-row .lr-addr{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+.lookup-row .lr-meta{ font-size:12px; color:var(--ink-faint); margin-top:3px; display:flex; gap:6px; flex-wrap:wrap; }
+.lookup-row .lr-thumb{ width:48px; height:48px; border-radius:10px; background:var(--surface-2); flex:none; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:20px; }
+.lookup-row .lr-thumb img{ width:100%; height:100%; object-fit:cover; }
+.attribution{ font-size:11px; color:var(--ink-faint); margin-top:8px; text-align:right; }
+.found-line{ display:flex; align-items:flex-start; gap:8px; font-size:13.5px; color:var(--ink); background:var(--surface-2); border-radius:12px; padding:10px 12px; margin:-6px 0 14px; line-height:1.4; }
+.found-line .fl-text{ flex:1; min-width:0; }
+.found-line .fl-sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+.found-line button{ background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--accent); padding:0 2px; cursor:pointer; flex:none; }
+.status-pill{ display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--surface-2); color:var(--ink-soft); }
+.status-pill.open{ background:var(--accent-soft); color:var(--accent); }
+.status-pill.closed{ background:var(--chili-soft); color:var(--chili); }
+.status-pill.soon{ background:var(--gold-soft); color:var(--gold); }
+.status-pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+.hours-list{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; }
+.hours-list .today{ color:var(--ink); font-weight:600; }
+.photo-credit{ font-size:11px; color:var(--ink-faint); margin:-8px 0 12px; text-align:right; }
+.photo-credit a{ color:inherit; }
+.g-rating{ font-size:12px; color:var(--ink-faint); font-weight:500; white-space:nowrap; }
+.spinner{ width:18px; height:18px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent); animation:exportSpin .8s linear infinite; display:inline-block; vertical-align:middle; }
 .center-loading{ margin-top:30vh; text-align:center; }
 .center-loading .fork{ font-size:44px; line-height:1; margin-bottom:14px; animation:pulse 1.6s ease-in-out infinite; }
 
@@ -387,6 +411,12 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 </style>
 </head>
 <body>
+<script>
+  // Two Forks configuration. googleMapsKey: the "two-forks-web" key from
+  // Google Cloud (restricted to this site + Maps JavaScript, Places (New) and
+  // Geocoding). Leave empty to use OpenStreetMap lookups only.
+  window.TWO_FORKS_CONFIG = Object.assign({ googleMapsKey: "" }, window.TWO_FORKS_CONFIG || {});
+</script>
 <script>try{var t=localStorage.getItem("twoforks:theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <div id="app"></div>
 <div id="toast-root"></div>
@@ -441,8 +471,12 @@ var IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && !/Andro
 // Apple Maps on Apple devices (opens the native app), Google Maps directions
 // everywhere else - an apple.com link on Android lands on a web page that
 // can't actually route you.
-function mapsUrl(name,address){
+function mapsUrl(name,address,place){
   var q=[name,address].filter(Boolean).join(" ");
+  if(place && place.lat!=null && place.lng!=null){
+    if(IS_APPLE) return "https://maps.apple.com/?daddr="+encodeURIComponent(place.address ? (name+", "+place.address) : (place.lat+","+place.lng));
+    return "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(place.lat+","+place.lng)+(place.placeId?"&destination_place_id="+encodeURIComponent(place.placeId):"");
+  }
   if(IS_APPLE) return "https://maps.apple.com/?daddr="+encodeURIComponent(q);
   return "https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q);
 }
@@ -665,7 +699,8 @@ var S = {
   exportPicker:null, exporting:false, filterSheet:false,
   joinDraft:false, startDraft:false, loadingSpace:false,
   authDraft:{email:"", password:""},
-  online: navigator.onLine !== false, pendingWrites:false
+  online: navigator.onLine !== false, pendingWrites:false,
+  userLoc:null, nearMe:false, shuffleRadius:0, backfill:null
 };
 window.addEventListener("online", function(){ S.online = true; render(); });
 window.addEventListener("offline", function(){ S.online = false; render(); });
@@ -720,6 +755,7 @@ function restoreUi(ui){
 function overlayKeys(){
   var keys = [];
   if(S.sheet) keys.push("sheet:"+S.sheet.type+":"+(S.sheet.place&&S.sheet.place.id));
+  if(S.backfill) keys.push("backfill");
   if(S.sheet && S.sheet.reviewDraft) keys.push("review:"+S.sheet.reviewDraft.id);
   if(S.exportPicker) keys.push("export");
   if(S.filterSheet) keys.push("filters");
@@ -936,6 +972,7 @@ function iconEdit(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fil
 function iconCopy(){ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>'; }
 function iconSliders(){ return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>'; }
 function iconSort(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h9M3 18h5M18 9v10M15 16l3 3 3-3"/></svg>'; }
+function iconPhone(){ return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8 9.8a16 16 0 006.3 6.3l1.3-1.3a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/></svg>'; }
 function iconCamera(){ return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>'; }
 function iconTwoForks(large){
   var ridge = large ? (
@@ -968,6 +1005,7 @@ function shellHtml(){
   if(S.sheet) html += sheetHtml();
   if(S.sheet && S.sheet.reviewDraft) html += reviewSheetHtml();
   if(S.filterSheet) html += filterSheetHtml();
+  if(S.backfill) html += backfillSheetHtml();
   if(S.exportPicker) html += exportPickerHtml();
   if(S.exporting) html += exportingOverlayHtml();
   return html;
@@ -997,13 +1035,14 @@ function syncNoteHtml(){
   var title = !S.online ? "You're offline — changes are kept on this phone and sync when you're back" : (S.pendingWrites ? "Sending your latest changes" : "Everything is saved and shared");
   return '<span class="sync-note '+cls+'" title="'+title+'" aria-live="polite"><span class="sync-dot"></span>'+label+'</span>';
 }
-var SORT_LABELS = {top:"Highest rated", visited:"Last visited", recent:"Recently added", name:"Name A–Z"};
+var SORT_LABELS = {top:"Highest rated", visited:"Last visited", near:"Nearest", recent:"Recently added", name:"Name A–Z"};
 function listMetaHtml(count){
   var n = S.activeFilters.length;
   var html = '<div class="list-meta"><div class="meta-left"><span>'+count+' '+(count===1?"place":"places")+'</span>';
   if(n) html += '<button type="button" id="clear-filters-btn">Clear '+n+' filter'+(n>1?"s":"")+'</button>';
   html += '</div>';
   if(S.tab==="been") html += '<button type="button" id="sort-btn" aria-label="Change sort">'+iconSort()+' '+SORT_LABELS[S.sortBeen]+'</button>';
+  else if(S.tab==="want" && S.nearMe) html += '<button type="button" id="sort-btn" aria-label="Change order">'+iconSort()+' Nearest</button>';
   html += '</div>';
   return html;
 }
@@ -1012,7 +1051,7 @@ function filterSheetHtml(){
   var html = overlayOpen("filter-overlay", "filters");
   html += '<div class="sheet-header"><h2>Filters</h2><div class="sheet-actions"><button class="icon-btn" id="filter-close" aria-label="Close">'+iconClose()+'</button></div></div><div class="sheet-body">';
   if(S.tab==="been"){
-    html += '<div class="field"><label>Sort by</label><div class="chips-edit" style="margin-top:2px;">'+["top","visited","recent","name"].map(function(k){
+    html += '<div class="field"><label>Sort by</label><div class="chips-edit" style="margin-top:2px;">'+["top","visited","near","recent","name"].map(function(k){
       return '<button type="button" class="chip'+(S.sortBeen===k?" active":"")+'" data-sort="'+k+'" aria-pressed="'+(S.sortBeen===k?"true":"false")+'">'+SORT_LABELS[k]+'</button>';
     }).join("")+'</div></div>';
   }
@@ -1021,6 +1060,11 @@ function filterSheetHtml(){
       var active = S.activeFilters.indexOf(f.key)>-1;
       return '<button type="button" class="chip'+(active?" active":"")+'" data-filter-key="'+escapeHtml(f.key)+'" aria-pressed="'+(active?"true":"false")+'">'+escapeHtml(f.label)+'</button>';
     }).join("");
+  }
+  if(S.tab==="want"){
+    html += '<div class="field"><label>Order</label><div class="chips-edit" style="margin-top:2px;">'+
+      '<button type="button" class="chip'+(!S.nearMe?" active":"")+'" data-near-me="0" aria-pressed="'+(!S.nearMe?"true":"false")+'">By category</button>'+
+      '<button type="button" class="chip'+(S.nearMe?" active":"")+'" data-near-me="1" aria-pressed="'+(S.nearMe?"true":"false")+'">Nearest first</button></div></div>';
   }
   html += '<div class="field"><label>Features</label><div class="chips-edit" style="margin-top:2px;">'+chips("feature")+'</div></div>';
   html += '<div class="field"><label>Neighborhood</label><div class="chips-edit" style="margin-top:2px;">'+chips("neighborhood")+'</div><p class="helper-text" style="margin:8px 0 0;">Pick more than one to see any of them.</p></div>';
@@ -1061,8 +1105,10 @@ function tabContentHtml(){
   if(S.tab==="settings") return settingsTabHtml();
   return "";
 }
+function coverSrc(p){ return p.coverPhoto || p.googlePhotoUrl || null; }
 function placeCardHtml(p){
-  var thumb = p.coverPhoto ? '<img src="'+escapeHtml(p.coverPhoto)+'" alt="">' : defaultCoverEmoji(p);
+  var cover = coverSrc(p);
+  var thumb = cover ? '<img src="'+escapeHtml(cover)+'" alt="" loading="lazy">' : defaultCoverEmoji(p);
   var reviews = p.reviews||[];
   var avg = avgRating(reviews);
   var priceStr = p.price ? Array(p.price+1).join("$") : "";
@@ -1083,21 +1129,30 @@ function placeCardHtml(p){
   html += '<div class="place-thumb" aria-hidden="true">'+thumb+'</div><div class="place-main">';
   html += '<div class="place-top"><div class="place-name">'+escapeHtml(p.name)+'</div>'+(priceStr?'<div class="price-tag">'+priceStr+'</div>':'')+'</div>';
   html += '<div class="place-meta">'+metaBits.map(function(m,i){return (i>0?'<span class="dot-sep"></span>':'')+m;}).join("")+'</div>';
+  var dist = placeDistance(p);
   if(avg!=null){
     var per = perPersonAverages(reviews);
     html += '<div class="rating-line">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b>'+
       (per.length>1 ? per.map(function(pp){ return miniPersonHtml(pp.name, pp.avg.toFixed(1)); }).join("") : '<span class="per-person">'+(reviews.length===1?"1 review":reviews.length+" reviews")+'</span>')+
       '</div>';
+  } else if(isWant && typeof p.googleRating==="number"){
+    html += '<div class="rating-line"><span class="g-rating">Google '+p.googleRating.toFixed(1)+(p.googleRatingCount?' ('+p.googleRatingCount.toLocaleString()+')':'')+'</span></div>';
   }
   if(!isWant){
     var days = lastVisitDays(p);
-    if(days!=null) html += '<div class="visit-note">Last visit '+relDays(days)+'</div>';
+    var bits = [];
+    if(days!=null) bits.push("Last visit "+relDays(days));
+    if(dist!=null) bits.push(formatMiles(dist)+" away");
+    if(bits.length) html += '<div class="visit-note">'+escapeHtml(bits.join(" · "))+'</div>';
   } else {
     if(p.notes) html += '<div class="want-note"><b>Want to try:</b> '+escapeHtml(p.notes)+'</div>';
     if(p.source) html += '<div class="want-note" style="margin-top:2px;"><b>Source:</b> '+escapeHtml(p.source)+'</div>';
+    if(dist!=null) html += '<div class="visit-note">'+escapeHtml(formatMiles(dist))+' away</div>';
   }
-  if(placeHasHappyHour || p.patio || (p.tags && p.tags.length)){
+  var st = openStatus(p);
+  if(placeHasHappyHour || p.patio || (p.tags && p.tags.length) || st.state==="closed" || st.soon){
     html += '<div class="tag-row">'+
+      (st.state==="closed" ? '<span class="tag-pill" style="color:var(--chili);">'+(st.closedToday?"Closed today":"Closed now")+'</span>' : (st.soon ? '<span class="tag-pill" style="color:var(--gold);">Closing soon</span>' : ''))+
       (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (placeHasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
       (p.patio ? '<span class="tag-pill">⛱️ Patio</span>' : '')+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
@@ -1153,8 +1208,12 @@ function emptyStateHtml(kind){
 function sortBeenList(list){
   if(S.sortBeen==="top") return list.slice().sort(function(a,b){ return ((avgRating(b.reviews)||0)-(avgRating(a.reviews)||0)) || a.name.localeCompare(b.name); });
   if(S.sortBeen==="visited") return list.slice().sort(function(a,b){ var da=lastVisitDays(a), db=lastVisitDays(b); if(da==null) da=1e9; if(db==null) db=1e9; return (da-db) || a.name.localeCompare(b.name); });
+  if(S.sortBeen==="near") return sortByDistance(list);
   if(S.sortBeen==="recent") return list.slice().sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
   return list.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+function sortByDistance(list){
+  return list.slice().sort(function(a,b){ var da=placeDistance(a), db=placeDistance(b); if(da==null) da=1e9; if(db==null) db=1e9; return (da-db) || a.name.localeCompare(b.name); });
 }
 function searchResultsHtml(){
   var been = sortBeenList(filteredPlaces("been"));
@@ -1174,6 +1233,7 @@ function wantTabHtml(){
   var list = filteredPlaces("want");
   if(!list.length) return emptyStateHtml("want");
   var html = listMetaHtml(list.length);
+  if(S.nearMe) return html + sortByDistance(list).map(placeCardHtml).join("");
   if(S.categoryFilter) return html + list.sort(function(a,b){return a.name.localeCompare(b.name);}).map(placeCardHtml).join("");
   // Each place is listed once, under its first category (its other
   // categories still show in the card), so a two-category spot doesn't
@@ -1196,10 +1256,16 @@ function shuffleTabHtml(){
     '<button class="'+(S.shuffleMode==="favorite"?"active":"")+'" data-shuffle-mode="favorite">Go-to favorite</button></div>';
   html += '<div class="chip-row" style="margin-top:12px;"><button class="chip'+(!S.shuffleCategory?" active":"")+'" data-shuffle-cat="">Any category</button>'+
     cats.map(function(c){ return '<button class="chip'+(S.shuffleCategory===c?" active":"")+'" data-shuffle-cat="'+escapeHtml(c)+'">'+escapeHtml(c)+'</button>'; }).join("")+'</div>';
+  html += '<div class="chip-row" style="margin-top:4px;">'+[[0,"Any distance"],[2,"Within 2 mi"],[5,"Within 5 mi"]].map(function(o){
+    return '<button class="chip'+(S.shuffleRadius===o[0]?" active":"")+'" data-shuffle-radius="'+o[0]+'">'+o[1]+'</button>';
+  }).join("")+'</div>';
+  html += '<p class="helper-text" style="margin:10px 0 0;">Places with known hours are only picked while they\'re open.</p>';
   if(S.shuffleResult){
     var p = S.shuffleResult; var avg = avgRating(p.reviews);
+    var sst = openStatus(p); var sd = placeDistance(p);
     html += '<div class="shuffle-card" aria-live="polite"><div class="fork">'+(S.shuffleMode==="new"?"🎲":"⭐")+'</div>'+
-      '<h3 class="display">'+escapeHtml(p.name)+'</h3><div class="cat">'+escapeHtml(getCategories(p).join(", "))+((p.neighborhood||p.address)?" · "+escapeHtml(p.neighborhood||p.address):"")+'</div>'+
+      '<h3 class="display">'+escapeHtml(p.name)+'</h3><div class="cat">'+escapeHtml(getCategories(p).join(", "))+((p.neighborhood||p.address)?" · "+escapeHtml(p.neighborhood||p.address):"")+(sd!=null?" · "+escapeHtml(formatMiles(sd)):"")+'</div>'+
+      (sst.label ? '<div style="margin-bottom:10px;"><span class="status-pill '+(sst.state==="open"?(sst.soon?"soon":"open"):"closed")+'"><span class="dot"></span>'+escapeHtml(sst.label)+'</span></div>' : '')+
       (avg!=null?('<div class="rating-line" style="justify-content:center;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b></div>'):"")+
       '<div style="display:flex;gap:10px;margin-top:16px;"><button class="btn btn-secondary btn-block" id="shuffle-view">View details</button>'+
       '<button class="btn btn-primary btn-block" id="shuffle-again">Shuffle again</button></div></div>';
@@ -1230,6 +1296,12 @@ function settingsTabHtml(){
     '<button class="btn btn-secondary btn-sm btn-block" id="copy-app-link">'+iconCopy()+' Copy link</button>'+
     '</div></div>';
 
+  var missing = S.places.filter(function(p){ return !hasPin(p); }).length;
+  html += '<div class="card-panel" style="margin-bottom:16px;">';
+  html += '<div class="section-heading" style="margin-top:0;">Place details</div>';
+  html += '<p class="helper-text">'+(missing ? missing+' place'+(missing===1?'':'s')+' on this list '+(missing===1?'has':'have')+' no address, map pin or hours yet. Look each one up and confirm the match.' : 'Every place on this list has an address and map pin.')+'</p>';
+  html += '<button type="button" class="btn btn-secondary btn-block" id="backfill-btn" '+(missing?'':'disabled')+'>Find details for '+missing+' place'+(missing===1?'':'s')+'</button>';
+  html += '<p class="attribution" style="text-align:left;margin-top:8px;">Lookups by Google, with OpenStreetMap as a fallback.</p></div>';
   html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="section-heading" style="margin-top:0;">Export restaurants</div>';
   html += '<p class="helper-text">Pick some restaurants and turn them into a printable PDF you can send without a link.</p>';
@@ -1309,12 +1381,12 @@ function exportPlaceCardHtml(p){
   var per = perPersonAverages(reviews);
   var hh = getHappyHour(p);
   var hhActive = hasHappyHour(p);
-  var loc = [p.neighborhood, p.address].filter(Boolean).join(" · ");
+  var loc = [p.address, (!p.address ? p.neighborhood : null)].filter(Boolean).join(" · ");
   var html = '<div class="export-card">';
   html += '<h2>'+escapeHtml(p.name||"Untitled")+'</h2>';
   html += '<div class="export-meta"><span class="export-badge">'+(p.status==="been"?"Been there":"Want to go")+'</span>'+
     (cats.length?escapeHtml(cats.join(", ")):"")+(priceStr?" · "+priceStr:"")+(loc?" · "+escapeHtml(loc):"")+'</div>';
-  if(p.name && p.name.trim()) html += '<div class="export-meta"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'">Get Directions</a></div>';
+  if(p.name && p.name.trim()) html += '<div class="export-meta"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood),p)+'">Get Directions</a></div>';
   if(p.coverPhoto) html += '<img class="export-photo" src="'+escapeHtml(p.coverPhoto)+'" alt="">';
   if(avg!=null){
     var perStr = per.map(function(pp){ return escapeHtml(pp.name)+" "+pp.avg.toFixed(1); }).join(" · ");
@@ -1335,6 +1407,7 @@ function exportPlaceCardHtml(p){
     }
     if(p.happyHourMenuUrl) html += '<div class="export-meta">Happy Hour menu: <a href="'+escapeHtml(p.happyHourMenuUrl)+'">'+escapeHtml(p.happyHourMenuUrl)+'</a></div>';
   }
+  if(p.googlePhone) html += '<div class="export-meta">Phone: '+escapeHtml(p.googlePhone)+'</div>';
   if(p.website) html += '<div class="export-meta">Website: <a href="'+escapeHtml(p.website)+'">'+escapeHtml(p.website)+'</a></div>';
   if((p.tags||[]).length) html += '<div class="export-meta">Tags: '+escapeHtml(p.tags.join(", "))+'</div>';
   if(p.source) html += '<div class="export-meta"><b>Source:</b> '+escapeHtml(p.source)+'</div>';
@@ -1452,6 +1525,309 @@ function applyImportedBackup(data){
   }).catch(function(){ showToast("Import failed — try again"); });
 }
 
+/* ---------------- Place lookups (Google Places -> OpenStreetMap -> Google Geocoder) ---------------- */
+// Google is only ever called from a tap (Find, Locate, the Settings pass,
+// or opening a place whose Google details are >30 days old), never while
+// typing. Every Google call is wrapped so a missing key, a disabled API or an
+// exhausted allowance falls through to the next provider without breaking
+// the form. Calls are capped per page load as a last line of defence.
+var GOOGLE_MAPS_KEY = (window.TWO_FORKS_CONFIG && window.TWO_FORKS_CONFIG.googleMapsKey) || "";
+var CITY_CENTER = {lat:44.9778, lng:-93.2650};   // downtown Minneapolis
+var CITY_NAME = "Minneapolis, MN";
+var MAX_LOOKUP_MILES = 40;
+var GOOGLE_CALL_CAP = 30;
+var GOOGLE_STALE_DAYS = 30;
+var PLACE_FIELDS = ["id","displayName","formattedAddress","location","websiteURI","nationalPhoneNumber","regularOpeningHours","priceLevel","rating","userRatingCount","types","photos"];
+var FOOD_TYPE_RE = /restaurant|cafe|coffee|bar$|^bar_|pub|bakery|food|ice_cream|dessert|meal_|brewery|winery|night_club|diner|deli|tea_house|juice|donut|bagel|sandwich|pizza|steak|seafood|sushi|ramen|taco/;
+var NEIGHBORHOOD_CENTERS = {
+  "Mill District": {lat:44.9782, lng:-93.2558, r:0.6},
+  "North Loop":    {lat:44.9860, lng:-93.2770, r:0.8},
+  "Downtown":      {lat:44.9770, lng:-93.2700, r:1.1},
+  "Eat Street":    {lat:44.9560, lng:-93.2780, r:0.7},
+  "Uptown":        {lat:44.9483, lng:-93.2983, r:1.1},
+  "Northeast":     {lat:45.0020, lng:-93.2500, r:1.9},
+  "St. Paul":      {lat:44.9537, lng:-93.0900, r:5.0}
+};
+var CATEGORY_TYPE_HINTS = [
+  [/thai/, "Thai"], [/indian/, "Indian"], [/pizza/, "Pizza"], [/sushi|japanese/, "Sushi"], [/mexican|taco/, "Tacos"],
+  [/hamburger|burger/, "Burgers"], [/ice_cream|dessert|gelato/, "Ice Cream"], [/coffee|cafe|tea_house/, "Coffee"],
+  [/^bar$|wine_bar|cocktail|pub|brewery|night_club|^bar_/, "Bars & Drinks"]
+];
+var googleCalls = 0, googleDisabled = false, gmapsPromise = null;
+window.gm_authFailure = function(){ googleDisabled = true; };
+
+function milesBetween(a, b){
+  if(!a || !b || a.lat==null || b.lat==null) return null;
+  var R = 3958.8, dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+  var s = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+function formatMiles(mi){ if(mi==null) return ""; if(mi < 0.1) return "right here"; return (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + " mi"; }
+function guessNeighborhood(lat, lng){
+  var best = null, bestScore = Infinity;
+  Object.keys(NEIGHBORHOOD_CENTERS).forEach(function(name){
+    if(NEIGHBORHOODS.indexOf(name)===-1) return;
+    var c = NEIGHBORHOOD_CENTERS[name];
+    var d = milesBetween({lat:lat,lng:lng}, c);
+    if(d==null || d > c.r) return;
+    var score = d / c.r;           // nearest relative to each area's size
+    if(score < bestScore){ bestScore = score; best = name; }
+  });
+  return best;
+}
+function guessCategories(types){
+  var cats = S.space.categories||[];
+  function existing(name){ return cats.filter(function(c){ return c.toLowerCase()===name.toLowerCase(); })[0] || null; }
+  var out = [];
+  (types||[]).forEach(function(t){
+    CATEGORY_TYPE_HINTS.forEach(function(h){ if(h[0].test(t)){ var c = existing(h[1]); if(c && out.indexOf(c)===-1) out.push(c); } });
+    var m = /^([a-z_]+)_restaurant$/.exec(t);
+    if(m){ var c2 = existing(m[1].replace(/_/g," ")); if(c2 && out.indexOf(c2)===-1) out.push(c2); }
+  });
+  return out;
+}
+function priceFromLevel(level){
+  var s = String(level||"").replace(/^PRICE_LEVEL_/,"");
+  return {INEXPENSIVE:1, MODERATE:2, EXPENSIVE:3, VERY_EXPENSIVE:4}[s] || 0;
+}
+function normalizeHours(oh){
+  if(!oh || !oh.periods || !oh.periods.length) return null;
+  var periods = [];
+  oh.periods.forEach(function(p){
+    if(!p || !p.open) return;
+    periods.push({
+      od: +p.open.day||0, oh: +p.open.hour||0, om: +p.open.minute||0,
+      cd: p.close ? (+p.close.day||0) : null, ch: p.close ? (+p.close.hour||0) : null, cm: p.close ? (+p.close.minute||0) : null
+    });
+  });
+  if(!periods.length) return null;
+  return { periods: periods, text: (oh.weekdayDescriptions||[]).slice() };
+}
+// {state:"open"|"closed"|"unknown", label:"Open now · closes 10:00 PM" ...}
+function openStatus(p, now){
+  var h = p.googleHours;
+  if(!h || !h.periods || !h.periods.length) return {state:"unknown", label:""};
+  now = now || new Date();
+  var nowMin = now.getDay()*1440 + now.getHours()*60 + now.getMinutes();
+  var WEEK = 7*1440;
+  function hhmm(hr, mn){ return formatTime12h(String(hr).padStart(2,"0")+":"+String(mn).padStart(2,"0")); }
+  var openUntil = null, nextOpen = null;
+  for(var i=0;i<h.periods.length;i++){
+    var per = h.periods[i];
+    if(per.cd==null) return {state:"open", label:"Open 24 hours"};
+    var start = per.od*1440 + per.oh*60 + per.om;
+    var end = per.cd*1440 + per.ch*60 + per.cm;
+    if(end <= start) end += WEEK;
+    for(var k=-1;k<=1;k++){
+      var s = start + k*WEEK, e = end + k*WEEK;
+      if(nowMin >= s && nowMin < e){ openUntil = {hr:per.ch, mn:per.cm, soon:(e-nowMin)<=60}; }
+      else if(s > nowMin && (nextOpen==null || s < nextOpen.at)){ nextOpen = {at:s, hr:per.oh, mn:per.om, sameDay: Math.floor(s/1440)===Math.floor(nowMin/1440)}; }
+    }
+  }
+  if(openUntil) return {state:"open", label:(openUntil.soon?"Closing soon · ":"Open now · closes ")+hhmm(openUntil.hr, openUntil.mn), soon:openUntil.soon};
+  if(nextOpen && nextOpen.sameDay) return {state:"closed", label:"Closed · opens "+hhmm(nextOpen.hr, nextOpen.mn)+" today"};
+  if(nextOpen){
+    var dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][Math.floor((nextOpen.at % WEEK)/1440)];
+    return {state:"closed", label:"Closed today · opens "+dayName+" "+hhmm(nextOpen.hr, nextOpen.mn), closedToday:true};
+  }
+  return {state:"closed", label:"Closed", closedToday:true};
+}
+function todayHoursText(p){
+  var h = p.googleHours; if(!h || !h.text || !h.text.length) return "";
+  // Google lists Monday first; JS getDay() has Sunday = 0
+  var idx = (new Date().getDay()+6)%7;
+  return h.text[idx] || "";
+}
+
+function loadGoogleMaps(){
+  if(!GOOGLE_MAPS_KEY || googleDisabled) return Promise.reject(new Error("google_off"));
+  if(window.google && window.google.maps && window.google.maps.importLibrary) return Promise.resolve(window.google.maps);
+  if(gmapsPromise) return gmapsPromise;
+  gmapsPromise = new Promise(function(resolve, reject){
+    var done = false;
+    window.__gmapsReady = function(){ done = true; resolve(window.google.maps); };
+    var s = document.createElement("script");
+    s.src = "https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(GOOGLE_MAPS_KEY)+"&v=weekly&loading=async&callback=__gmapsReady";
+    s.async = true;
+    s.onerror = function(){ gmapsPromise = null; reject(new Error("google_load_failed")); };
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!done){ gmapsPromise = null; reject(new Error("google_timeout")); } }, 12000);
+  });
+  return gmapsPromise;
+}
+function googleBudgetOk(){ return googleCalls < GOOGLE_CALL_CAP; }
+function placeFromGoogle(gp){
+  if(!gp) return null;
+  var loc = gp.location;
+  var lat = loc ? (typeof loc.lat==="function" ? loc.lat() : loc.lat) : null;
+  var lng = loc ? (typeof loc.lng==="function" ? loc.lng() : loc.lng) : null;
+  if(lat==null || lng==null) return null;
+  if(milesBetween(CITY_CENTER, {lat:lat,lng:lng}) > MAX_LOOKUP_MILES) return null;
+  var photoUrl = null, photoAttribution = null;
+  try{
+    if(gp.photos && gp.photos.length){
+      photoUrl = gp.photos[0].getURI ? gp.photos[0].getURI({maxWidth:900}) : null;
+      var a = gp.photos[0].authorAttributions || [];
+      if(a.length) photoAttribution = {name: a[0].displayName||"", uri: a[0].uri||""};
+    }
+  }catch(e){}
+  var types = gp.types || [];
+  return {
+    source:"google", placeId: gp.id||null, name: String(gp.displayName||""), address: gp.formattedAddress||"", lat:lat, lng:lng,
+    website: gp.websiteURI||"", phone: gp.nationalPhoneNumber||"", hours: normalizeHours(gp.regularOpeningHours),
+    price: priceFromLevel(gp.priceLevel), rating: (typeof gp.rating==="number") ? gp.rating : null, ratingCount: gp.userRatingCount||null,
+    types: types, photoUrl: photoUrl, photoAttribution: photoAttribution, isFood: types.some(function(t){ return FOOD_TYPE_RE.test(t); })
+  };
+}
+function googleSearch(query){
+  if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
+  return loadGoogleMaps().then(function(maps){
+    googleCalls++;
+    return maps.importLibrary("places").then(function(lib){
+      return lib.Place.searchByText({ textQuery: query+", "+CITY_NAME, fields: PLACE_FIELDS, maxResultCount: 3, locationBias: CITY_CENTER });
+    });
+  }).then(function(res){
+    var out = (res && res.places ? res.places : []).map(placeFromGoogle).filter(Boolean);
+    // restaurants, cafes, bars and food first; otherwise keep Google's order
+    return out.filter(function(r){ return r.isFood; }).concat(out.filter(function(r){ return !r.isFood; }));
+  });
+}
+function googleFetchById(placeId){
+  if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
+  return loadGoogleMaps().then(function(maps){
+    googleCalls++;
+    return maps.importLibrary("places").then(function(lib){
+      var place = new lib.Place({id: placeId});
+      return place.fetchFields({fields: PLACE_FIELDS.filter(function(f){ return f!=="id"; })}).then(function(){ return placeFromGoogle(place); });
+    });
+  });
+}
+function googleGeocode(query){
+  if(!googleBudgetOk()) return Promise.reject(new Error("cap"));
+  return loadGoogleMaps().then(function(maps){
+    googleCalls++;
+    return maps.importLibrary("geocoding").then(function(lib){
+      return new lib.Geocoder().geocode({ address: query+", "+CITY_NAME });
+    });
+  }).then(function(res){
+    return (res && res.results ? res.results : []).slice(0,3).map(function(g){
+      var lat = g.geometry.location.lat(), lng = g.geometry.location.lng();
+      if(milesBetween(CITY_CENTER, {lat:lat,lng:lng}) > MAX_LOOKUP_MILES) return null;
+      return {source:"google-geocode", placeId:null, name:"", address:g.formatted_address||"", lat:lat, lng:lng, website:"", phone:"", hours:null, price:0, rating:null, ratingCount:null, types:[], photoUrl:null, photoAttribution:null, isFood:false};
+    }).filter(Boolean);
+  });
+}
+// OpenStreetMap's Nominatim: free, keyless, light use only (and never for
+// autocomplete, per its usage policy). extratags often carries website/phone.
+function nominatimSearch(query){
+  var url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=3&addressdetails=1&extratags=1&namedetails=1"+
+    "&viewbox=-93.60,45.30,-92.80,44.70&q="+encodeURIComponent(query+" "+CITY_NAME);
+  return fetch(url, {headers:{"Accept":"application/json"}}).then(function(r){ if(!r.ok) throw new Error("nominatim_"+r.status); return r.json(); }).then(function(rows){
+    return (rows||[]).map(function(row){
+      var lat = parseFloat(row.lat), lng = parseFloat(row.lon);
+      if(isNaN(lat) || isNaN(lng) || milesBetween(CITY_CENTER, {lat:lat,lng:lng}) > MAX_LOOKUP_MILES) return null;
+      var a = row.address || {};
+      var street = [a.house_number, a.road].filter(Boolean).join(" ");
+      var addr = [street, a.city||a.town||a.village||a.suburb, a.state, a.postcode].filter(Boolean).join(", ") || (row.display_name||"");
+      var ex = row.extratags || {};
+      var nm = (row.namedetails && row.namedetails.name) || row.name || "";
+      return {source:"osm", placeId:null, name:nm, address:addr, lat:lat, lng:lng, website: ex.website||ex["contact:website"]||"", phone: ex.phone||ex["contact:phone"]||"", hours:null, price:0, rating:null, ratingCount:null,
+        types:[row.type||""], photoUrl:null, photoAttribution:null, isFood:/restaurant|cafe|bar|pub|fast_food|ice_cream|bakery|food/.test(String(row.type)+" "+String(row.category))};
+    }).filter(Boolean);
+  });
+}
+// Full chain for "find this restaurant by name".
+function lookupPlace(query){
+  return googleSearch(query).catch(function(){ return []; }).then(function(res){
+    if(res.length) return res;
+    return nominatimSearch(query).catch(function(){ return []; });
+  }).then(function(res){
+    if(res.length) return res;
+    return googleGeocode(query).catch(function(){ return []; });
+  });
+}
+// Address-only chain for manually entered places: Google Geocoder, then OSM.
+function locateAddress(address){
+  return googleGeocode(address).catch(function(){ return []; }).then(function(res){
+    if(res.length) return res;
+    return nominatimSearch(address).catch(function(){ return []; });
+  });
+}
+function lookupSourceLabel(results){
+  if(!results || !results.length) return "";
+  return results[0].source==="osm" ? "Results from OpenStreetMap" : "Powered by Google";
+}
+// Writes a lookup result onto a place draft. Anything the person already
+// typed wins; Google only fills blanks, except the location fields, which
+// a lookup is explicitly asked to replace.
+function applyLookupToPlace(place, r, opts){
+  opts = opts || {};
+  if(r.name && (opts.takeName || !place.name || !place.name.trim())) place.name = r.name;
+  place.address = r.address || place.address || "";
+  place.lat = r.lat; place.lng = r.lng;
+  place.placeId = r.placeId || null;
+  place.locationSource = r.source==="osm" ? "osm" : (r.source==="google-geocode" ? "google-geocode" : (r.placeId ? "google" : "manual"));
+  if(r.website && !(place.website||"").trim()) place.website = r.website;
+  if(r.phone) place.googlePhone = r.phone;
+  if(r.hours) place.googleHours = r.hours;
+  if(r.rating!=null){ place.googleRating = r.rating; place.googleRatingCount = r.ratingCount||null; }
+  if(r.photoUrl){ place.googlePhotoUrl = r.photoUrl; place.googlePhotoAttribution = r.photoAttribution||null; }
+  if(r.types && r.types.length) place.googleTypes = r.types.slice(0,12);
+  if(r.placeId) place.googleFetchedAt = new Date().toISOString();
+  if(!place.price && r.price) place.price = r.price;
+  if(!getCategories(place).length && r.types){ var guessed = guessCategories(r.types); if(guessed.length){ place.categories = guessed; delete place.category; } }
+  if(!place.neighborhood){ var hood = guessNeighborhood(r.lat, r.lng); if(hood) place.neighborhood = hood; }
+  return place;
+}
+function clearLookupFromPlace(place){
+  ["address","placeId","locationSource","googlePhone","googleHours","googleRating","googleRatingCount","googlePhotoUrl","googlePhotoAttribution","googleTypes","googleFetchedAt"].forEach(function(k){ delete place[k]; });
+  place.address = ""; place.lat = null; place.lng = null;
+}
+function googleDetailsStale(p){
+  if(!p.placeId) return false;
+  if(!p.googleFetchedAt) return true;
+  return (Date.now() - new Date(p.googleFetchedAt).getTime()) > GOOGLE_STALE_DAYS*86400000;
+}
+var refreshingIds = {};
+// Opening a place whose Google details are over 30 days old quietly refreshes
+// the Google-sourced fields (never the person's own notes, ratings or edits).
+function maybeRefreshGoogleDetails(p){
+  if(!p || !googleDetailsStale(p) || refreshingIds[p.id] || !S.online) return;
+  if(!GOOGLE_MAPS_KEY || googleDisabled || !googleBudgetOk()) return;
+  refreshingIds[p.id] = true;
+  googleFetchById(p.placeId).then(function(r){
+    var live = S.places.filter(function(x){ return x.id===p.id; })[0];
+    if(!r || !live) return;
+    var updated = Object.assign({}, live);
+    updated.address = r.address || updated.address; updated.lat = r.lat; updated.lng = r.lng;
+    if(r.phone) updated.googlePhone = r.phone;
+    if(r.hours) updated.googleHours = r.hours;
+    if(r.rating!=null){ updated.googleRating = r.rating; updated.googleRatingCount = r.ratingCount||null; }
+    if(r.photoUrl){ updated.googlePhotoUrl = r.photoUrl; updated.googlePhotoAttribution = r.photoAttribution||null; }
+    if(!(updated.website||"").trim() && r.website) updated.website = r.website;
+    updated.googleFetchedAt = new Date().toISOString();
+    var data = Object.assign({}, updated); var id = data.id; delete data.id; delete data.isNew;
+    return store.savePlace(S.spaceCode, id, data);
+  }).catch(function(){}).then(function(){ delete refreshingIds[p.id]; });
+}
+
+/* ---------------- Your location (for distances) ---------------- */
+function requestLocation(force){
+  if(S.userLoc && !force && (Date.now()-S.userLoc.at) < 5*60000) return Promise.resolve(S.userLoc);
+  if(!navigator.geolocation) return Promise.reject(new Error("no_geolocation"));
+  return new Promise(function(resolve, reject){
+    navigator.geolocation.getCurrentPosition(function(pos){
+      S.userLoc = {lat: pos.coords.latitude, lng: pos.coords.longitude, at: Date.now()};
+      resolve(S.userLoc);
+    }, function(err){ reject(err); }, {enableHighAccuracy:false, timeout:8000, maximumAge:120000});
+  });
+}
+function placeDistance(p){
+  if(!S.userLoc || p.lat==null || p.lng==null) return null;
+  return milesBetween(S.userLoc, {lat:p.lat, lng:p.lng});
+}
+function hasPin(p){ return p && p.lat!=null && p.lng!=null; }
+
 /* ---------------- Sheet ---------------- */
 var NEIGHBORHOODS = ["Downtown","Eat Street","Mill District","North Loop","Northeast","Uptown","St. Paul","New Haven","Other"];
 var NEIGHBORHOODS_NO_CITY_HINT = ["St. Paul","New Haven","Other"];
@@ -1472,6 +1848,7 @@ var FILTER_PRESETS = [
 }));
 function blankPlace(status, category){
   return { id: uid(), name:"", categories: category ? [category] : [], status: status||"want", address:"", neighborhood:"", website:"",
+    lat:null, lng:null, placeId:null, locationSource:"manual",
     price:0, patio:false, happyHourMenuUrl:"", notes:"", source:"", tags:[], coverPhoto:null, reviews:[], addedBy:S.meUid, createdAt: new Date().toISOString(), isNew:true };
 }
 function blankReview(){
@@ -1481,6 +1858,27 @@ function openPlaceSheet(place, mode){
   S.sheet = {type:"edit", place: Object.assign({}, place)};
   S.sheet.originalPlace = Object.assign({}, S.sheet.place);
   S.sheet.mode = mode || (place.isNew ? "edit" : "view");
+  if(S.sheet.mode==="view" && !place.isNew) maybeRefreshGoogleDetails(place);
+}
+function openFindSheet(status){
+  S.sheet = {type:"find", status: status||"want", query:"", results:null, busy:false};
+  S.confirmDeleteId=null; S.confirmDeleteReviewId=null;
+  render();
+  setTimeout(function(){ var i=document.getElementById("find-input"); if(i) i.focus(); }, 50);
+}
+function normName(n){ return String(n||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+function startPlaceFromResult(r, status){
+  var dup = (r.placeId ? S.places.filter(function(x){ return x.placeId===r.placeId; })[0] : null) ||
+            (r.name ? S.places.filter(function(x){ return normName(x.name)===normName(r.name); })[0] : null);
+  if(dup){
+    openPlaceSheet(dup, "view"); render();
+    showToast("Already on your list as "+dup.name+" ("+(dup.status==="been"?"Been There":"Want to Go")+")");
+    return;
+  }
+  var place = blankPlace(status, S.categoryFilter);
+  applyLookupToPlace(place, r, {takeName:true});
+  openPlaceSheet(place, "edit");
+  render();
 }
 function normalizeUrl(u){
   u = (u||"").trim();
@@ -1489,8 +1887,75 @@ function normalizeUrl(u){
   return u;
 }
 function sheetHtml(){
+  if(S.sheet.type==="find") return findSheetHtml();
   if(S.sheet.type!=="edit") return "";
   return S.sheet.mode==="edit" ? editSheetHtml(S.sheet.place) : placeViewHtml(S.sheet.place);
+}
+function lookupRowsHtml(results, attr){
+  if(!results || !results.length) return "";
+  var html = '<div class="lookup-results">'+results.map(function(r, i){
+    var sub = [];
+    if(r.price) sub.push(Array(r.price+1).join("$"));
+    if(r.rating!=null) sub.push("Google "+r.rating.toFixed(1));
+    if(r.website) sub.push("website");
+    if(r.hours) sub.push("hours");
+    var hood = guessNeighborhood(r.lat, r.lng);
+    if(hood) sub.push(hood);
+    return '<button type="button" class="lookup-row" '+attr+'="'+i+'">'+
+      '<span class="lr-thumb">'+(r.photoUrl ? '<img src="'+escapeHtml(r.photoUrl)+'" alt="">' : (r.isFood ? "🍽️" : "📍"))+'</span>'+
+      '<span style="flex:1;min-width:0;"><div class="lr-name">'+escapeHtml(r.name || r.address || "Unnamed result")+'</div>'+
+      (r.name && r.address ? '<div class="lr-addr">'+escapeHtml(r.address)+'</div>' : '')+
+      (sub.length ? '<div class="lr-meta">'+sub.map(escapeHtml).join(" · ")+'</div>' : '')+'</span></button>';
+  }).join("")+'</div><div class="attribution">'+escapeHtml(lookupSourceLabel(results))+'</div>';
+  return html;
+}
+function statusPillHtml(p){
+  var st = openStatus(p);
+  if(!st.label) return "";
+  return '<span class="status-pill '+(st.state==="open"?(st.soon?"soon":"open"):"closed")+'"><span class="dot"></span>'+escapeHtml(st.label)+'</span>';
+}
+/* ---------------- Add a place: find first ---------------- */
+function findSheetHtml(){
+  var f = S.sheet;
+  var html = overlayOpen("sheet-overlay", "sheet:find:");
+  html += '<div class="sheet-header"><h2>Add a place</h2><div class="sheet-actions"><button class="icon-btn" id="sheet-close" aria-label="Close">'+iconClose()+'</button></div></div><div class="sheet-body">';
+  html += '<form id="find-form"><div class="field"><label for="find-input">Restaurant name</label>'+
+    '<div class="input-with-actions"><input type="text" id="find-input" value="'+escapeHtml(f.query||"")+'" placeholder="e.g. Hai Hai" autocomplete="off" autocapitalize="words" enterkeyhint="search">'+
+    '<button type="submit" class="btn btn-primary btn-sm" id="find-go" '+(f.busy?"disabled":"")+'>'+(f.busy?'<span class="spinner" aria-hidden="true"></span>':'Find')+'</button></div></div></form>';
+  if(f.results && f.results.length){
+    html += '<p class="helper-text" style="margin:0 0 4px;">Tap the right one and the address, website, hours and photo fill in for you.</p>';
+    html += lookupRowsHtml(f.results, "data-pick-result");
+  } else if(f.results && !f.results.length){
+    html += '<p class="helper-text">Nothing matched “'+escapeHtml(f.query)+'” near Minneapolis. Try the full name, or add it by hand below.</p>';
+  } else {
+    html += '<p class="helper-text">Type the name and tap Find. Details come from Google, or OpenStreetMap when Google is unavailable.</p>';
+  }
+  html += '<div class="link-row" style="margin-top:14px;"><button type="button" class="link-btn" id="find-manual-btn">Add it by hand instead</button></div>';
+  html += '</div></div></div>';
+  return html;
+}
+/* ---------------- Settings: find details for existing places ---------------- */
+function backfillSheetHtml(){
+  var b = S.backfill;
+  var total = b.queue.length;
+  var html = overlayOpen("backfill-overlay", "backfill", ' style="z-index:22;"');
+  html += '<div class="sheet-header"><h2>Find details</h2><div class="sheet-actions"><button class="icon-btn" id="bf-stop" aria-label="Close">'+iconClose()+'</button></div></div><div class="sheet-body">';
+  if(b.index >= total){
+    html += '<p class="detail-text" style="margin-bottom:8px;">Done. Updated '+b.done+' place'+(b.done===1?'':'s')+(b.skipped?', skipped '+b.skipped:'')+'.</p>';
+  } else {
+    var cur = S.places.filter(function(x){ return x.id===b.queue[b.index]; })[0];
+    html += '<p class="helper-text" style="margin:0 0 6px;">'+(b.index+1)+' of '+total+'</p>';
+    html += '<h3 class="display" style="font-size:22px;margin:0 0 10px;">'+escapeHtml(cur ? cur.name : "")+'</h3>';
+    if(b.busy) html += '<p class="helper-text"><span class="spinner" aria-hidden="true"></span> Looking it up…</p>';
+    else if(b.results && b.results.length) html += '<p class="helper-text" style="margin:0 0 4px;">Is it one of these?</p>'+lookupRowsHtml(b.results, "data-bf-use");
+    else if(b.results) html += '<p class="helper-text">No match found. Skip it, or open the place later and add the address by hand.</p>';
+    else if(b.capped) html += '<p class="helper-text">Lookup limit reached for now. Close and reopen the app to continue with the rest.</p>';
+  }
+  html += '</div><div class="sheet-footer">'+
+    (b.index >= total ? '<button class="btn btn-primary btn-block" id="bf-close">Close</button>' :
+      '<button class="btn btn-secondary btn-block" id="bf-skip" '+(b.busy?"disabled":"")+'>Skip</button><button class="btn btn-secondary btn-block" id="bf-stop2">Stop</button>')+
+    '</div></div></div>';
+  return html;
 }
 function placeViewHtml(p){
   var placeCats = getCategories(p);
@@ -1503,8 +1968,13 @@ function placeViewHtml(p){
     '<button class="icon-btn" id="sheet-close" aria-label="Close">'+iconClose()+'</button>'+
     '</div></div>';
   html += '<div class="sheet-body">';
-  if(p.coverPhoto){
-    html += '<img class="hero" src="'+escapeHtml(p.coverPhoto)+'" alt="">';
+  var cover = coverSrc(p);
+  if(cover){
+    html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="">';
+    if(!p.coverPhoto && p.googlePhotoAttribution && p.googlePhotoAttribution.name){
+      var pa = p.googlePhotoAttribution;
+      html += '<div class="photo-credit">Photo: '+(pa.uri?'<a href="'+escapeHtml(pa.uri)+'" target="_blank" rel="noopener">'+escapeHtml(pa.name)+'</a>':escapeHtml(pa.name))+' · Google</div>';
+    }
   } else {
     html += '<div class="hero-emoji" aria-hidden="true">'+defaultCoverEmoji(p)+'</div>';
   }
@@ -1527,16 +1997,28 @@ function placeViewHtml(p){
     html += '<div class="rating-line" style="margin:0 0 14px;">'+starsHtml(avg)+'<b>'+avg.toFixed(1)+'</b><span class="per-person">'+escapeHtml(countStr)+(lastDays!=null?' · last visit '+relDays(lastDays):'')+'</span>'+
       (per.length>1 ? '<span style="flex-basis:100%;display:flex;gap:10px;flex-wrap:wrap;">'+per.map(function(pp){ return miniPersonHtml(pp.name, pp.avg.toFixed(1)); }).join("")+'</span>' : '')+'</div>';
   }
+  var pill = statusPillHtml(p);
+  var gRating = (avg==null && typeof p.googleRating==="number") ? '<span class="g-rating">Google '+p.googleRating.toFixed(1)+(p.googleRatingCount?' ('+p.googleRatingCount.toLocaleString()+' reviews)':'')+'</span>' : '';
+  var dist = placeDistance(p);
+  if(pill || gRating || dist!=null){
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;">'+pill+gRating+(dist!=null?'<span class="g-rating">'+escapeHtml(formatMiles(dist))+' away</span>':'')+'</div>';
+  }
   var actionLinks = [];
-  if(p.name && p.name.trim()) actionLinks.push('<a class="btn btn-secondary btn-sm" href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'" target="_blank" rel="noopener" style="text-decoration:none;">'+iconMap()+' Directions</a>');
+  if(p.name && p.name.trim()) actionLinks.push('<a class="btn btn-secondary btn-sm" href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood),p)+'" target="_blank" rel="noopener" style="text-decoration:none;">'+iconMap()+' Directions</a>');
+  if(p.googlePhone) actionLinks.push('<a class="btn btn-secondary btn-sm" href="tel:'+escapeHtml(String(p.googlePhone).replace(/[^+\d]/g,""))+'" style="text-decoration:none;">'+iconPhone()+' Call</a>');
   if(p.website){
     var siteFav = faviconUrl(p.website);
     actionLinks.push('<a class="btn btn-secondary btn-sm" href="'+escapeHtml(p.website)+'" target="_blank" rel="noopener" style="text-decoration:none;">'+(siteFav?'<img src="'+escapeHtml(siteFav)+'" alt="" width="16" height="16" style="border-radius:4px;">':'')+' Website</a>');
   }
   if(actionLinks.length) html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">'+actionLinks.join("")+'</div>';
   if(p.neighborhood || p.address){
-    var locText = [p.neighborhood, p.address].filter(Boolean).join(" · ");
-    html += '<div class="field"><label>Location</label><div class="detail-text">'+escapeHtml(locText)+'</div></div>';
+    html += '<div class="field"><label>Location</label><div class="detail-text">'+escapeHtml(p.address||"")+(p.address && p.neighborhood ? '<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);">'+escapeHtml(p.neighborhood)+'</div>' : escapeHtml(p.neighborhood||""))+'</div></div>';
+  }
+  if(p.googleHours && p.googleHours.text && p.googleHours.text.length){
+    var todayIdx = (new Date().getDay()+6)%7;
+    html += '<div class="field"><label>Hours</label><div class="hours-list">'+p.googleHours.text.map(function(line, i){
+      return '<div class="'+(i===todayIdx?"today":"")+'">'+escapeHtml(line)+'</div>';
+    }).join("")+'</div><div class="attribution">Hours and details from Google</div></div>';
   }
   if(p.source) html += '<div class="field"><label>Source</label><div class="detail-text soft">'+escapeHtml(p.source)+'</div></div>';
   if(p.notes) html += '<div class="field"><label>Notes</label><div class="detail-text soft">'+escapeHtml(p.notes)+'</div></div>';
@@ -1576,6 +2058,19 @@ function editSheetHtml(p){
   html += '<div class="segment" style="margin-bottom:16px;"><button class="'+(p.status==="want"?"active":"")+'" data-set-status="want">Want to go</button>'+
     '<button class="'+(p.status==="been"?"active":"")+'" data-set-status="been">Been there</button></div>';
   html += '<div class="field"><label for="f-name">Name</label><input type="text" id="f-name" value="'+escapeHtml(p.name)+'" placeholder="e.g. El Camion" autocomplete="off" autocapitalize="words" enterkeyhint="next"></div>';
+  if(hasPin(p) || (p.address && p.address.trim())){
+    var srcLabel = p.placeId ? "Details from Google" : (p.locationSource==="osm" ? "From OpenStreetMap" : (p.locationSource==="google-geocode" ? "Located by Google" : "Entered by hand"));
+    html += '<div class="found-line"><span aria-hidden="true">📍</span><span class="fl-text">'+escapeHtml(p.address||"Pinned on the map")+'<div class="fl-sub">'+srcLabel+(hasPin(p)?" · map pin set":"")+'</div></span><button type="button" id="lookup-again-btn">Find again</button></div>';
+  } else {
+    html += '<div style="margin:-6px 0 14px;">'+
+      '<button type="button" class="btn btn-secondary btn-block" id="lookup-btn" '+(S.sheet.lookupBusy?"disabled":"")+'>'+(S.sheet.lookupBusy?'<span class="spinner" aria-hidden="true"></span> Finding…':'🔎 Find address & website')+'</button>'+
+      (S.sheet.lookupResults && S.sheet.lookupResults.length ? lookupRowsHtml(S.sheet.lookupResults, "data-use-result")+'<div class="link-row"><button type="button" class="link-btn" id="lookup-dismiss">None of these</button></div>' :
+        (S.sheet.lookupResults ? '<p class="helper-text" style="margin:8px 0 0;">Nothing matched near Minneapolis. You can add the address by hand below.</p>' : ''))+
+      '</div>';
+    html += '<div class="field"><label for="f-address">Address <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
+      '<div class="input-with-actions"><input type="text" id="f-address" value="'+escapeHtml(p.address||"")+'" placeholder="Street address" autocomplete="off" enterkeyhint="done">'+
+      '<button type="button" class="btn btn-secondary btn-sm" id="locate-btn" '+(S.sheet.locateBusy?"disabled":"")+'>'+(S.sheet.locateBusy?'<span class="spinner" aria-hidden="true"></span>':'Locate')+'</button></div></div>';
+  }
   var placeCats = getCategories(p);
   var catOptions = cats.slice();
   placeCats.forEach(function(c){ if(catOptions.indexOf(c)===-1) catOptions.unshift(c); });
@@ -1589,7 +2084,7 @@ function editSheetHtml(p){
     '<option value=""'+(!p.neighborhood?" selected":"")+'>—</option>'+
     NEIGHBORHOODS.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(p.neighborhood===n?" selected":"")+'>'+escapeHtml(n)+'</option>'; }).join("")+
     '</select></div>';
-  if(p.name && p.name.trim()) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood))+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
+  if(p.name && p.name.trim()) html += '<div style="margin:-8px 0 14px;"><a href="'+mapsUrl(p.name,locationQueryHint(p.address,p.neighborhood),p)+'" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">'+iconMap()+' Get Directions</a></div>';
   html += '<div class="field"><label for="f-website">Website or menu <span style="text-transform:none;font-weight:400;">(optional)</span></label>'+
     '<div class="input-with-actions"><input type="url" id="f-website" value="'+escapeHtml(p.website||"")+'" placeholder="https://…" inputmode="url" autocapitalize="none" autocorrect="off" style="font:inherit;font-size:16px;padding:11px 13px;border-radius:12px;min-height:46px;border:1px solid var(--border);background:var(--surface);color:var(--ink);-webkit-appearance:none;">'+
     '<button type="button" class="btn btn-secondary btn-sm" id="website-paste-btn">Paste</button>'+
@@ -1646,8 +2141,9 @@ function editSheetHtml(p){
   html += '<div class="field"><label>Cover photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
     (p.coverPhoto ?
       '<div class="photo-thumb"><img src="'+escapeHtml(p.coverPhoto)+'" alt=""><button type="button" data-cover-del="1" aria-label="Remove photo">'+iconClose()+'</button></div>' :
-      '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">')+
-    '</div></div>';
+      ((p.googlePhotoUrl ? '<div class="photo-thumb" title="From Google"><img src="'+escapeHtml(p.googlePhotoUrl)+'" alt=""></div>' : '')+
+       '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>'+(p.googlePhotoUrl?'Your own':'Add')+'</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">'))+
+    '</div>'+(p.googlePhotoUrl && !p.coverPhoto ? '<p class="helper-text" style="margin:8px 0 0;">Google\'s photo is used until you add your own.</p>' : '')+'</div>';
   html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by friend, Reddit, NYT, etc."></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label for="f-tag-input">Tags</label><div class="input-with-actions"><input type="text" id="f-tag-input" placeholder="e.g. cash only, date night" autocomplete="off" enterkeyhint="done"><button type="button" class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
@@ -1761,7 +2257,37 @@ function bindShell(){
     S.tab=next; S.categoryFilter=null; S.activeFilters=[]; S.search=""; S.shuffleResult=null; S.filterSheet=false; render();
     var c2=document.getElementById("content"); if(c2) c2.scrollTop=0;
   }; });
-  if((el=document.getElementById("fab-add"))) el.onclick = function(){ openPlaceSheet(blankPlace(S.tab==="been"?"been":"want", S.categoryFilter)); S.confirmDeleteId=null; S.confirmDeleteReviewId=null; render(); };
+  if((el=document.getElementById("fab-add"))) el.onclick = function(){ openFindSheet(S.tab==="been"?"been":"want"); };
+  document.querySelectorAll("[data-shuffle-radius]").forEach(function(b){ b.onclick=function(){ S.shuffleRadius=+b.getAttribute("data-shuffle-radius"); S.shuffleResult=null; render(); }; });
+  document.querySelectorAll("[data-near-me]").forEach(function(b){ b.onclick=function(){
+    var on = b.getAttribute("data-near-me")==="1";
+    if(on && !S.userLoc){
+      requestLocation().then(function(){ S.nearMe=true; render(); }).catch(function(){ showToast("Couldn't get your location — check Location permissions for this site"); });
+      return;
+    }
+    S.nearMe = on; render();
+  }; });
+  if((el=document.getElementById("backfill-btn"))) el.onclick = function(){
+    var queue = S.places.filter(function(p){ return !hasPin(p); }).sort(function(a,b){ return a.name.localeCompare(b.name); }).map(function(p){ return p.id; });
+    if(!queue.length) return;
+    S.backfill = {queue:queue, index:0, results:null, busy:false, done:0, skipped:0, capped:false};
+    render();
+    backfillLookupCurrent();
+  };
+  if((el=document.getElementById("bf-skip"))) el.onclick = function(){ S.backfill.skipped++; backfillAdvance(); };
+  if((el=document.getElementById("bf-stop"))) el.onclick = function(){ S.backfill=null; render(); };
+  if((el=document.getElementById("bf-stop2"))) el.onclick = function(){ S.backfill=null; render(); };
+  if((el=document.getElementById("bf-close"))) el.onclick = function(){ S.backfill=null; render(); };
+  document.querySelectorAll("[data-bf-use]").forEach(function(b){ b.onclick=function(){
+    var r = S.backfill.results[+b.getAttribute("data-bf-use")];
+    var live = S.places.filter(function(x){ return x.id===S.backfill.queue[S.backfill.index]; })[0];
+    if(!r || !live){ backfillAdvance(); return; }
+    var updated = applyLookupToPlace(Object.assign({}, live), r, {takeName:false});
+    var data = Object.assign({}, updated); var id = data.id; delete data.id; delete data.isNew;
+    store.savePlace(S.spaceCode, id, data).catch(function(){ showToast("Couldn't save that — try again"); });
+    S.backfill.done++;
+    backfillAdvance();
+  }; });
   document.querySelectorAll("[data-cat]").forEach(function(b){ b.onclick=function(){ S.categoryFilter=b.getAttribute("data-cat")||null; render(); }; });
   document.querySelectorAll("[data-filter-key]").forEach(function(b){
     b.onclick = function(){
@@ -1771,7 +2297,14 @@ function bindShell(){
       render();
     };
   });
-  document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){ S.sortBeen=b.getAttribute("data-sort"); render(); }; });
+  document.querySelectorAll("[data-sort]").forEach(function(b){ b.onclick=function(){
+    var k = b.getAttribute("data-sort");
+    if(k==="near" && !S.userLoc){
+      requestLocation().then(function(){ S.sortBeen="near"; render(); }).catch(function(){ showToast("Couldn't get your location — check Location permissions for this site"); });
+      return;
+    }
+    S.sortBeen=k; render();
+  }; });
   if((el=document.getElementById("search-input"))){
     el.oninput = function(){ S.search = this.value; render(); };
     el.onkeydown = function(e){ if(e.key==="Enter"){ e.preventDefault(); this.blur(); } };
@@ -1994,8 +2527,14 @@ function weightedRandomPick(pool, weightFn){
   return pool[pool.length-1];
 }
 function runShuffle(){
+  if(S.shuffleRadius && !S.userLoc){
+    requestLocation().then(function(){ runShuffle(); }).catch(function(){ showToast("Couldn't get your location — showing any distance"); S.shuffleRadius=0; runShuffle(); });
+    return;
+  }
   var pool = S.places.filter(function(p){
     if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
+    if(openStatus(p).state==="closed") return false;
+    if(S.shuffleRadius){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
     if(S.shuffleMode==="new") return (p.status||"want")==="want";
     if((p.status||"want")!=="been") return false;
     var avg = avgRating(p.reviews);
@@ -2004,10 +2543,12 @@ function runShuffle(){
   if(!pool.length){
     pool = S.places.filter(function(p){
       if(S.shuffleCategory && getCategories(p).indexOf(S.shuffleCategory)===-1) return false;
+      if(openStatus(p).state==="closed") return false;
+      if(S.shuffleRadius){ var d = placeDistance(p); if(d==null || d > S.shuffleRadius) return false; }
       return S.shuffleMode==="new" ? (p.status||"want")==="want" : (p.status||"want")==="been";
     });
   }
-  if(!pool.length){ showToast("Nothing to pick from yet"); S.shuffleResult=null; render(); return; }
+  if(!pool.length){ showToast(S.shuffleRadius ? "Nothing open within "+S.shuffleRadius+" miles right now" : "Nothing open to pick from right now"); S.shuffleResult=null; render(); return; }
   var pick, guard=0;
   do {
     pick = S.shuffleMode==="favorite"
@@ -2018,8 +2559,26 @@ function runShuffle(){
   S.shuffleResult = pick; render();
 }
 
+function backfillLookupCurrent(){
+  var b = S.backfill; if(!b || b.index >= b.queue.length) return;
+  var cur = S.places.filter(function(x){ return x.id===b.queue[b.index]; })[0];
+  if(!cur){ backfillAdvance(); return; }
+  if(GOOGLE_MAPS_KEY && !googleDisabled && !googleBudgetOk()){ b.capped = true; b.results = null; b.busy = false; render(); return; }
+  b.busy = true; b.results = null; render();
+  lookupPlace(cur.name).then(function(res){
+    if(!S.backfill || S.backfill!==b) return;
+    b.busy = false; b.results = res; render();
+  });
+}
+function backfillAdvance(){
+  var b = S.backfill; if(!b) return;
+  b.index++; b.results = null; b.capped = false;
+  render();
+  if(b.index < b.queue.length) backfillLookupCurrent();
+}
 function bindSheet(){
   if(!S.sheet) return;
+  if(S.sheet.type==="find"){ bindFindSheet(); return; }
   var el;
   var overlay = document.getElementById("sheet-overlay");
   if(overlay) overlay.onclick = function(e){ if(e.target===overlay) closeSheet(); };
@@ -2104,6 +2663,55 @@ function bindSheet(){
       syncSheetFieldsIntoPlace(place); render();
     };
   }
+  if((el=document.getElementById("lookup-btn"))){
+    el.onclick = function(){
+      syncSheetFieldsIntoPlace(place);
+      var name = (place.name||"").trim();
+      if(!name){ showToast("Add a name first"); var n=document.getElementById("f-name"); if(n) n.focus(); return; }
+      S.sheet.lookupBusy = true; S.sheet.lookupResults = null; render();
+      var sheetRef = S.sheet;
+      lookupPlace(name).then(function(res){
+        if(S.sheet!==sheetRef) return;
+        sheetRef.lookupBusy = false; sheetRef.lookupResults = res; render();
+      });
+    };
+  }
+  document.querySelectorAll("[data-use-result]").forEach(function(b){ b.onclick=function(){
+    var r = S.sheet.lookupResults[+b.getAttribute("data-use-result")]; if(!r) return;
+    var dup = (r.placeId ? S.places.filter(function(x){ return x.placeId===r.placeId && x.id!==place.id; })[0] : null) ||
+              (place.isNew && r.name ? S.places.filter(function(x){ return normName(x.name)===normName(r.name) && x.id!==place.id; })[0] : null);
+    if(dup){ showToast("That's already on your list as "+dup.name); return; }
+    syncSheetFieldsIntoPlace(place);
+    applyLookupToPlace(place, r, {takeName: !!place.isNew});
+    S.sheet.lookupResults = null; S.sheet.lookupSource = r.source;
+    render();
+  }; });
+  if((el=document.getElementById("lookup-dismiss"))) el.onclick = function(){ S.sheet.lookupResults = null; render(); };
+  if((el=document.getElementById("lookup-again-btn"))) el.onclick = function(){ syncSheetFieldsIntoPlace(place); clearLookupFromPlace(place); S.sheet.lookupResults = null; render(); };
+  if((el=document.getElementById("locate-btn"))){
+    el.onclick = function(){
+      syncSheetFieldsIntoPlace(place);
+      var addr = (place.address||"").trim();
+      if(!addr){ showToast("Type an address first"); var a=document.getElementById("f-address"); if(a) a.focus(); return; }
+      S.sheet.locateBusy = true; render();
+      var sheetRef = S.sheet;
+      locateAddress(addr).then(function(res){
+        if(S.sheet!==sheetRef) return;
+        sheetRef.locateBusy = false;
+        if(res.length){
+          var r = res[0];
+          place.address = r.address || addr; place.lat = r.lat; place.lng = r.lng; place.placeId = null;
+          place.locationSource = r.source==="osm" ? "osm" : "google-geocode";
+          if(!place.neighborhood){ var hood = guessNeighborhood(r.lat, r.lng); if(hood) place.neighborhood = hood; }
+          showToast("Pinned on the map");
+        } else {
+          showToast("Couldn't find that address — check it and try again");
+        }
+        render();
+      });
+    };
+  }
+  if((el=document.getElementById("f-address"))) el.onkeydown = function(e){ if(e.key==="Enter"){ e.preventDefault(); var lb=document.getElementById("locate-btn"); if(lb) lb.click(); } };
   if((el=document.getElementById("website-search-btn"))){
     el.onclick = function(){
       var name = (document.getElementById("f-name")||{}).value || place.name || "";
@@ -2261,10 +2869,38 @@ function mergeLiveReviews(place){
   var extra = (live.reviews||[]).filter(function(r){ return r && r.id && !mineIds[r.id] && !originalIds[r.id]; });
   if(extra.length) place.reviews = mine.concat(extra);
 }
+function bindFindSheet(){
+  var el, f = S.sheet;
+  var overlay = document.getElementById("sheet-overlay");
+  if(overlay) overlay.onclick = function(e){ if(e.target===overlay) closeSheet(); };
+  if((el=document.getElementById("sheet-close"))) el.onclick = closeSheet;
+  if((el=document.getElementById("find-input"))) el.oninput = function(){ f.query = this.value; };
+  if((el=document.getElementById("find-form"))) el.onsubmit = function(e){
+    e.preventDefault();
+    var q = (document.getElementById("find-input").value||"").trim();
+    if(!q){ showToast("Type the restaurant's name first"); return; }
+    f.query = q; f.busy = true; f.results = null; render();
+    lookupPlace(q).then(function(res){
+      if(S.sheet!==f) return;
+      f.busy = false; f.results = res; render();
+    });
+  };
+  document.querySelectorAll("[data-pick-result]").forEach(function(b){ b.onclick=function(){
+    var r = f.results[+b.getAttribute("data-pick-result")]; if(!r) return;
+    startPlaceFromResult(r, f.status);
+  }; });
+  if((el=document.getElementById("find-manual-btn"))) el.onclick = function(){
+    var place = blankPlace(f.status, S.categoryFilter);
+    place.name = (f.query||"").trim();
+    openPlaceSheet(place, "edit"); render();
+    setTimeout(function(){ var n=document.getElementById(place.name ? "f-address" : "f-name"); if(n) n.focus(); }, 50);
+  };
+}
 function syncSheetFieldsIntoPlace(place){
   var el;
   if((el=document.getElementById("f-name"))) place.name = el.value;
   if((el=document.getElementById("f-neighborhood"))) place.neighborhood = el.value;
+  if((el=document.getElementById("f-address")) && !place.placeId) place.address = el.value;
   if((el=document.getElementById("f-website"))) place.website = el.value;
   if((el=document.getElementById("f-hh-menu"))) place.happyHourMenuUrl = el.value;
   if((el=document.getElementById("f-source"))) place.source = el.value;
