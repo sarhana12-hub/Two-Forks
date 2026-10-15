@@ -1166,7 +1166,7 @@ function placeCardHtml(p){
   var st = openStatus(p);
   if(placeHasHappyHour || p.patio || (p.tags && p.tags.length) || st.state==="closed" || st.soon){
     html += '<div class="tag-row">'+
-      (st.state==="closed" ? '<span class="tag-pill" style="color:var(--chili);">'+(st.closedToday?"Closed today":"Closed now")+'</span>' : (st.soon ? '<span class="tag-pill" style="color:var(--gold);">Closing soon</span>' : ''))+
+      (st.state==="closed" ? '<span class="tag-pill" style="color:var(--chili);">'+(st.closedForDay?"Closed for the day":(st.closedToday?"Closed today":"Closed now"))+'</span>' : (st.soon ? '<span class="tag-pill" style="color:var(--gold);">Closing soon</span>' : ''))+
       (hhLiveNow ? '<span class="tag-pill tag-pill-live">🎉 Happy Hour now</span>' : (placeHasHappyHour ? '<span class="tag-pill">🍹 Happy Hour</span>' : ''))+
       (p.patio ? '<span class="tag-pill">⛱️ Patio</span>' : '')+
       (p.tags||[]).map(function(t){return '<span class="tag-pill">'+escapeHtml(t)+'</span>';}).join("")+
@@ -1706,7 +1706,8 @@ function openStatus(p, now){
   var nowMin = now.getDay()*1440 + now.getHours()*60 + now.getMinutes();
   var WEEK = 7*1440;
   function hhmm(hr, mn){ return formatTime12h(String(hr).padStart(2,"0")+":"+String(mn).padStart(2,"0")); }
-  var openUntil = null, nextOpen = null;
+  var openUntil = null, nextOpen = null, openedToday = false;
+  var todayIdx = Math.floor(nowMin/1440);
   for(var i=0;i<h.periods.length;i++){
     var per = h.periods[i];
     if(per.cd==null) return {state:"open", label:"Open 24 hours"};
@@ -1715,17 +1716,22 @@ function openStatus(p, now){
     if(end <= start) end += WEEK;
     for(var k=-1;k<=1;k++){
       var s = start + k*WEEK, e = end + k*WEEK;
+      if(e <= nowMin && Math.floor(s/1440)===todayIdx) openedToday = true;   // it was open earlier today
       if(nowMin >= s && nowMin < e){ openUntil = {hr:per.ch, mn:per.cm, soon:(e-nowMin)<=60}; }
       else if(s > nowMin && (nextOpen==null || s < nextOpen.at)){ nextOpen = {at:s, hr:per.oh, mn:per.om, sameDay: Math.floor(s/1440)===Math.floor(nowMin/1440)}; }
     }
   }
   if(openUntil) return {state:"open", label:(openUntil.soon?"Closing soon · ":"Open now · closes ")+hhmm(openUntil.hr, openUntil.mn), soon:openUntil.soon};
   if(nextOpen && nextOpen.sameDay) return {state:"closed", label:"Closed · opens "+hhmm(nextOpen.hr, nextOpen.mn)+" today"};
+  // Not opening again today: "Closed for the day" if it was open earlier
+  // (a lunch spot after lunch), "Closed today" if it never opens today.
+  var closedWord = openedToday ? "Closed for the day" : "Closed today";
   if(nextOpen){
-    var dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][Math.floor((nextOpen.at % WEEK)/1440)];
-    return {state:"closed", label:"Closed today · opens "+dayName+" "+hhmm(nextOpen.hr, nextOpen.mn), closedToday:true};
+    var daysAhead = Math.floor(nextOpen.at/1440) - todayIdx;
+    var dayName = daysAhead===1 ? "tomorrow" : ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][Math.floor(((nextOpen.at % WEEK)+WEEK) % WEEK/1440)];
+    return {state:"closed", label:closedWord+" · opens "+dayName+" "+hhmm(nextOpen.hr, nextOpen.mn), closedToday:true, closedForDay:openedToday};
   }
-  return {state:"closed", label:"Closed", closedToday:true};
+  return {state:"closed", label:closedWord, closedToday:true, closedForDay:openedToday};
 }
 function todayHoursText(p){
   var h = p.googleHours; if(!h || !h.text || !h.text.length) return "";
