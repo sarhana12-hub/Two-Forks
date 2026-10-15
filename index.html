@@ -1118,7 +1118,9 @@ function tabContentHtml(){
 }
 function coverSrc(p){ return p.coverPhoto || p.googlePhotoUrl || null; }
 function placeCardHtml(p){
-  var cover = coverSrc(p);
+  // Your own photo only: Google bills each display of one of its photos,
+  // so they're shown on the detail page (one load per open), never in lists.
+  var cover = p.coverPhoto || null;
   var thumb = cover ? '<img src="'+escapeHtml(cover)+'" alt="" loading="lazy">' : defaultCoverEmoji(p);
   var reviews = p.reviews||[];
   var avg = avgRating(reviews);
@@ -1315,7 +1317,7 @@ function settingsTabHtml(){
   html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="section-heading" style="margin-top:0;">Home</div>';
   if(home && !S.homeEdit){
-    html += '<div class="home-line"><span aria-hidden="true">🏠</span><span class="fl-text">'+escapeHtml(home.address||"Home")+'<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Travel times are worked out for Thursday at 6 PM and saved with each place.</div></span><button type="button" class="link-btn" id="home-change-btn" style="padding:0 2px;">Change</button></div>';
+    html += '<div class="home-line"><span aria-hidden="true">🏠</span><span class="fl-text">'+escapeHtml(home.address||"Home")+'<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);margin-top:2px;">Travel times from here are saved with each place.</div></span><button type="button" class="link-btn" id="home-change-btn" style="padding:0 2px;">Change</button></div>';
     var rb = guardBlocked("routes");
     if(S.travelPass){
       html += '<p class="helper-text"><span class="spinner" aria-hidden="true"></span> Working out travel times… '+S.travelPass.done+' of '+S.travelPass.total+'</p>';
@@ -1334,10 +1336,10 @@ function settingsTabHtml(){
     if(home) html += '<div class="link-row"><button type="button" class="link-btn" id="home-cancel-btn">Keep current home</button></div>';
   }
   html += '</div>';
-  var missing = S.places.filter(function(p){ return !hasPin(p); }).length;
+  var missing = S.places.filter(needsGoogleDetails).length;
   html += '<div class="card-panel" style="margin-bottom:16px;">';
   html += '<div class="section-heading" style="margin-top:0;">Place details</div>';
-  html += '<p class="helper-text">'+(missing ? missing+' place'+(missing===1?'':'s')+' on this list '+(missing===1?'has':'have')+' no address, map pin or hours yet. Look each one up and confirm the match.' : 'Every place on this list has an address and map pin.')+'</p>';
+  html += '<p class="helper-text">'+(missing ? missing+' place'+(missing===1?'':'s')+' on this list '+(missing===1?'doesn\'t':'don\'t')+' have Google details yet: hours, open-now, phone and rating. Look each one up and confirm the match.' : 'Every place on this list has its Google details.')+'</p>';
   html += '<button type="button" class="btn btn-secondary btn-block" id="backfill-btn" '+(missing?'':'disabled')+'>Find details for '+missing+' place'+(missing===1?'':'s')+'</button>';
   var lb = guardBlocked("lookups");
   if(lb){
@@ -2133,7 +2135,7 @@ function partIcon(x){
 function transferText(n){ return n==null ? "" : (n===0 ? "no transfers" : (n===1 ? "1 transfer" : n+" transfers")); }
 function travelLineHtml(p){
   var parts = travelParts(p); if(!parts.length) return "";
-  return '<span class="travel-line" title="From home, '+escapeHtml((p.travel&&p.travel.basis)||"")+'">'+parts.map(function(x, i){
+  return '<span class="travel-line">'+parts.map(function(x, i){
     var spoken = TRAVEL_WORD[x.mode]+(x.mode==="transit" && x.transfers ? ", "+transferText(x.transfers)+"," : "")+" ";
     return '<span class="travel-part"><span aria-hidden="true">'+partIcon(x)+'</span><span class="sr-only">'+spoken+'</span>'+x.min+(i===parts.length-1?' min':'')+'</span>';
   }).join('<span class="dot-sep"></span>')+'</span>';
@@ -2215,7 +2217,7 @@ function lookupRowsHtml(results, attr){
     var hood = guessNeighborhood(r.lat, r.lng);
     if(hood) sub.push(hood);
     return '<button type="button" class="lookup-row" '+attr+'="'+i+'">'+
-      '<span class="lr-thumb">'+(r.photoUrl ? '<img src="'+escapeHtml(r.photoUrl)+'" alt="">' : (r.isFood ? "🍽️" : "📍"))+'</span>'+
+      '<span class="lr-thumb">'+(r.isFood ? "🍽️" : "📍")+'</span>'+
       '<span style="flex:1;min-width:0;"><div class="lr-name">'+escapeHtml(r.name || r.address || "Unnamed result")+'</div>'+
       (r.name && r.address ? '<div class="lr-addr">'+escapeHtml(r.address)+'</div>' : '')+
       (sub.length ? '<div class="lr-meta">'+sub.map(escapeHtml).join(" · ")+'</div>' : '')+'</span></button>';
@@ -2261,7 +2263,8 @@ function backfillSheetHtml(){
     html += '<h3 class="display" style="font-size:22px;margin:0 0 10px;">'+escapeHtml(cur ? cur.name : "")+'</h3>';
     if(b.busy) html += '<p class="helper-text"><span class="spinner" aria-hidden="true"></span> Looking it up…</p>';
     else if(b.results && b.results.length) html += '<p class="helper-text" style="margin:0 0 4px;">Is it one of these?</p>'+lookupRowsHtml(b.results, "data-bf-use");
-    else if(b.results) html += '<p class="helper-text">No match found. Skip it, or open the place later and add the address by hand.</p>';
+    else if(b.results) html += '<p class="helper-text">No match found on Google. Skip it and it won\'t be suggested again.</p>';
+    else if(b.googleDown) html += '<p class="helper-text">Google isn\'t answering right now. Stop here and try again later; nothing was changed.</p>';
     else if(b.capped) html += '<p class="helper-text">Lookup limit reached for now. Close and reopen the app to continue with the rest.</p>';
   }
   html += '</div><div class="sheet-footer">'+
@@ -2283,7 +2286,7 @@ function placeViewHtml(p){
   html += '<div class="sheet-body">';
   var cover = coverSrc(p);
   if(cover){
-    html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="">';
+    html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="" onerror="var d=document.createElement(\'div\');d.className=\'hero-emoji\';d.textContent=\''+defaultCoverEmoji(p)+'\';this.replaceWith(d);var c=d.nextElementSibling;if(c&&c.classList.contains(\'photo-credit\'))c.remove();">';
     if(!p.coverPhoto && p.googlePhotoAttribution && p.googlePhotoAttribution.name){
       var pa = p.googlePhotoAttribution;
       html += '<div class="photo-credit">Photo: '+(pa.uri?'<a href="'+escapeHtml(pa.uri)+'" target="_blank" rel="noopener">'+escapeHtml(pa.name)+'</a>':escapeHtml(pa.name))+' · Google</div>';
@@ -2332,8 +2335,7 @@ function placeViewHtml(p){
         line += '<div style="font-size:12.5px;color:var(--ink-soft);margin:1px 0 4px;">'+escapeHtml(x.rides.map(function(r){ return r.line; }).join(" → "))+' · '+escapeHtml(transferText(x.transfers))+'</div>';
       }
       return '<div>'+line+'</div>';
-    }).join('')+'</div>'+
-      '<div class="attribution" style="text-align:left;">'+escapeHtml((p.travel&&p.travel.basis)||"")+' estimates from Google'+(travelNeeded(p)?' · will update':'')+'</div></div>';
+    }).join('')+'</div></div>';
   }
   if(p.neighborhood || p.address){
     html += '<div class="field"><label>Location</label><div class="detail-text">'+escapeHtml(p.address||"")+(p.address && p.neighborhood ? '<div class="fl-sub" style="font-size:12.5px;color:var(--ink-soft);">'+escapeHtml(p.neighborhood)+'</div>' : escapeHtml(p.neighborhood||""))+'</div></div>';
@@ -2465,9 +2467,8 @@ function editSheetHtml(p){
   html += '<div class="field"><label>Cover photo <span style="text-transform:none;font-weight:400;">(optional)</span></label><div class="photo-row">'+
     (p.coverPhoto ?
       '<div class="photo-thumb"><img src="'+escapeHtml(p.coverPhoto)+'" alt=""><button type="button" data-cover-del="1" aria-label="Remove photo">'+iconClose()+'</button></div>' :
-      ((p.googlePhotoUrl ? '<div class="photo-thumb" title="From Google"><img src="'+escapeHtml(p.googlePhotoUrl)+'" alt=""></div>' : '')+
-       '<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>'+(p.googlePhotoUrl?'Your own':'Add')+'</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">'))+
-    '</div>'+(p.googlePhotoUrl && !p.coverPhoto ? '<p class="helper-text" style="margin:8px 0 0;">Google\'s photo is used until you add your own.</p>' : '')+'</div>';
+      ('<button class="photo-add" id="cover-photo-add-btn">'+iconCamera()+'<span>Add</span></button><input type="file" id="cover-photo-file" accept="image/*" style="display:none;">'))+
+    '</div>'+(p.googlePhotoUrl && !p.coverPhoto ? '<p class="helper-text" style="margin:8px 0 0;">Google\'s photo shows on the detail page until you add your own.</p>' : '')+'</div>';
   html += '<div class="field"><label for="f-source">Source <span style="text-transform:none;font-weight:400;">(optional — who or where this came from)</span></label><input type="text" id="f-source" value="'+escapeHtml(p.source||"")+'" placeholder="Recommended by friend, Reddit, NYT, etc."></div>';
   html += '<div class="field"><label for="f-notes">Notes <span style="text-transform:none;font-weight:400;">(optional — dishes to try, reminders, etc.)</span></label><textarea id="f-notes" placeholder="Tacos al pastor, the mole, whatever\'s seasonal…">'+escapeHtml(p.notes||"")+'</textarea></div>';
   html += '<div class="field"><label for="f-tag-input">Tags</label><div class="input-with-actions"><input type="text" id="f-tag-input" placeholder="e.g. cash only, date night" autocomplete="off" enterkeyhint="done"><button type="button" class="btn btn-secondary btn-sm" id="f-tag-add">Add</button></div>'+
@@ -2615,13 +2616,17 @@ function bindShell(){
   if((el=document.getElementById("lookup-retry-btn"))) el.onclick = function(){ guardUnblock("lookups"); googleDisabled = false; render(); showToast("Google lookups will be tried on your next search"); };
   if((el=document.getElementById("travel-recalc-btn"))) el.onclick = function(){ runTravelPass(true); };
   if((el=document.getElementById("backfill-btn"))) el.onclick = function(){
-    var queue = S.places.filter(function(p){ return !hasPin(p); }).sort(function(a,b){ return a.name.localeCompare(b.name); }).map(function(p){ return p.id; });
+    var queue = S.places.filter(needsGoogleDetails).sort(function(a,b){ return a.name.localeCompare(b.name); }).map(function(p){ return p.id; });
     if(!queue.length) return;
     S.backfill = {queue:queue, index:0, results:null, busy:false, done:0, skipped:0, capped:false};
     render();
     backfillLookupCurrent();
   };
-  if((el=document.getElementById("bf-skip"))) el.onclick = function(){ S.backfill.skipped++; backfillAdvance(); };
+  if((el=document.getElementById("bf-skip"))) el.onclick = function(){
+    var b = S.backfill, id = b.queue[b.index];
+    if(b.results && b.answeredByGoogle && id) store.patchPlace(S.spaceCode, id, {googleSkipped:true}).catch(function(){});
+    b.skipped++; backfillAdvance();
+  };
   if((el=document.getElementById("bf-stop"))) el.onclick = function(){ S.backfill=null; render(); };
   if((el=document.getElementById("bf-stop2"))) el.onclick = function(){ S.backfill=null; render(); };
   if((el=document.getElementById("bf-close"))) el.onclick = function(){ S.backfill=null; render(); };
@@ -2629,7 +2634,12 @@ function bindShell(){
     var r = S.backfill.results[+b.getAttribute("data-bf-use")];
     var live = S.places.filter(function(x){ return x.id===S.backfill.queue[S.backfill.index]; })[0];
     if(!r || !live){ backfillAdvance(); return; }
+    var oldPin = hasPin(live) ? {lat: live.lat, lng: live.lng} : null;
     var updated = applyLookupToPlace(Object.assign({}, live), r, {takeName:false});
+    // Keep the pin it already had when Google's is within ~250 m, so the
+    // travel times already worked out for it stay valid.
+    if(oldPin && milesBetween(oldPin, {lat: updated.lat, lng: updated.lng}) < 0.15){ updated.lat = oldPin.lat; updated.lng = oldPin.lng; }
+    delete updated.googleSkipped;
     var data = Object.assign({}, updated); var id = data.id; delete data.id; delete data.isNew;
     store.savePlace(S.spaceCode, id, data).then(function(){ setTimeout(function(){ computeAndStoreTravel(id); }, 50); }).catch(function(){ showToast("Couldn't save that — try again"); });
     S.backfill.done++;
@@ -2908,15 +2918,26 @@ function runShuffle(){
   S.shuffleResult = pick; render();
 }
 
+// Places with no Google details yet. Places someone skipped stay skipped.
+function needsGoogleDetails(p){ return !p.placeId && !p.googleSkipped; }
 function backfillLookupCurrent(){
   var b = S.backfill; if(!b || b.index >= b.queue.length) return;
   var cur = S.places.filter(function(x){ return x.id===b.queue[b.index]; })[0];
   if(!cur){ backfillAdvance(); return; }
-  if(GOOGLE_MAPS_KEY && !googleDisabled && !googleBudgetOk()){ b.capped = true; b.results = null; b.busy = false; render(); return; }
+  b.answeredByGoogle = false;
+  if(!googleBudgetOk()){ b.capped = true; b.results = null; b.busy = false; render(); return; }
   b.busy = true; b.results = null; render();
-  lookupPlace(cur.name).then(function(res){
+  // A place that already has a pin is here for its Google details, so ask
+  // Google only; a place with no pin gets the full chain (Google, then
+  // OpenStreetMap) so it at least gets located.
+  var search = hasPin(cur)
+    ? googleSearch(cur.name).then(function(res){ b.answeredByGoogle = true; return res; }).catch(function(){ return null; })
+    : googleSearch(cur.name).then(function(res){ b.answeredByGoogle = true; return res.length ? res : lookupPlace(cur.name); }).catch(function(){ return lookupPlace(cur.name); });
+  search.then(function(res){
     if(!S.backfill || S.backfill!==b) return;
-    b.busy = false; b.results = res; render();
+    b.busy = false;
+    if(res===null){ b.results = null; b.googleDown = true; } else { b.results = res; b.googleDown = false; }
+    render();
   });
 }
 function backfillAdvance(){
