@@ -1933,7 +1933,9 @@ function routeMinutes(home, place, mode, when){
         if(mode==="TRANSIT") fields.push("legs");
         var req = { origin: origin, destination: dest, travelMode: mode, fields: fields };
         if(mode==="DRIVING"){ req.routingPreference = "TRAFFIC_AWARE"; req.departureTime = when; }
-        if(mode==="TRANSIT"){ req.departureTime = when; }
+        // Fewest transfers: trips with 2+ transfers aren't shown, so ask
+        // Google to prefer direct and one-transfer trips in the first place.
+        if(mode==="TRANSIT"){ req.departureTime = when; req.transitPreference = { routingPreference: "FEWER_TRANSFERS" }; }
         return lib.Route.computeRoutes(req).then(function(res){
           var r = res && res.routes && res.routes[0];
           if(!r) return {min:null, rides:null};
@@ -1950,7 +1952,7 @@ function routeMinutes(home, place, mode, when){
         return new Promise(function(resolve, reject){
           var opts = { origins:[origin], destinations:[dest], travelMode: mode };
           if(mode==="DRIVING") opts.drivingOptions = { departureTime: when };
-          if(mode==="TRANSIT") opts.transitOptions = { departureTime: when };
+          if(mode==="TRANSIT") opts.transitOptions = { departureTime: when, routingPreference: "FEWER_TRANSFERS" };
           new lib.DistanceMatrixService().getDistanceMatrix(opts, function(res, status){
             if(status!=="OK" || !res || !res.rows || !res.rows[0]) return reject(new Error("dm_"+status));
             var el = res.rows[0].elements[0];
