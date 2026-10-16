@@ -50,6 +50,7 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --tabbar-h: 62px;
   --radius-card: 16px;
+  --art-filter: none;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -58,7 +59,7 @@
     --accent: #4FBFA0; --accent-strong: #6ED4B7; --accent-ink: #0E1512; --accent-soft: #1C3A31; --gold: #E8BB63; --gold-soft: #3A2F1B;
     --chili: #E2705C; --chili-soft: #3A211B; --border: #362F24;
     --shadow: 0 8px 24px rgba(0,0,0,0.35); --shadow-lift: 0 14px 36px rgba(0,0,0,0.5);
-    --overlay: rgba(0,0,0,0.6); --toast-bg: #F3EDE2; --toast-ink: #16130F; --toast-action: #164F41;
+    --overlay: rgba(0,0,0,0.6); --toast-bg: #F3EDE2; --toast-ink: #16130F; --toast-action: #164F41; --art-filter: brightness(.72) saturate(.9);
   }
 }
 :root[data-theme="dark"]{
@@ -67,7 +68,7 @@
   --accent: #4FBFA0; --accent-strong: #6ED4B7; --accent-ink: #0E1512; --accent-soft: #1C3A31; --gold: #E8BB63; --gold-soft: #3A2F1B;
   --chili: #E2705C; --chili-soft: #3A211B; --border: #362F24;
   --shadow: 0 8px 24px rgba(0,0,0,0.35); --shadow-lift: 0 14px 36px rgba(0,0,0,0.5);
-  --overlay: rgba(0,0,0,0.6); --toast-bg: #F3EDE2; --toast-ink: #16130F; --toast-action: #164F41;
+  --overlay: rgba(0,0,0,0.6); --toast-bg: #F3EDE2; --toast-ink: #16130F; --toast-action: #164F41; --art-filter: brightness(.72) saturate(.9);
 }
 
 *{ box-sizing:border-box; }
@@ -212,6 +213,7 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
 .place-thumb{ width:64px; height:64px; border-radius:12px; background:var(--surface-2); flex:none; overflow:hidden;
   display:flex; align-items:center; justify-content:center; font-size:26px; }
 .place-thumb img{ width:100%; height:100%; object-fit:cover; }
+.place-thumb svg.art, .hero-art svg.art{ width:100%; height:100%; display:block; filter:var(--art-filter); }
 .place-main{ flex:1; min-width:0; }
 .place-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .place-name{ font-weight:600; font-size:16px; line-height:1.25; }
@@ -274,7 +276,7 @@ input[type=search]::-webkit-search-cancel-button{ -webkit-appearance:none; appea
   .sheet-header{ padding-top:14px; }
 }
 .hero{ width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:16px; margin-bottom:14px; display:block; }
-.hero-emoji{ width:100%; aspect-ratio:16/10; border-radius:16px; margin-bottom:14px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:64px; }
+.hero-art{ width:100%; aspect-ratio:16/10; border-radius:16px; margin-bottom:14px; overflow:hidden; background:var(--surface-2); }
 .view-title-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
 .view-title{ font-size:27px; margin:0; line-height:1.15; letter-spacing:-.01em; }
 .big-rating{ font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:700; color:var(--gold); flex:none; }
@@ -1120,7 +1122,7 @@ function placeCardHtml(p){
   // Your own photo only: Google bills each display of one of its photos,
   // so they're shown on the detail page (one load per open), never in lists.
   var cover = p.coverPhoto || null;
-  var thumb = cover ? '<img src="'+escapeHtml(cover)+'" alt="" loading="lazy">' : defaultCoverEmoji(p);
+  var thumb = cover ? '<img src="'+escapeHtml(cover)+'" alt="" loading="lazy">' : placeArt(p);
   var reviews = p.reviews||[];
   var avg = avgRating(reviews);
   var priceStr = p.price ? Array(p.price+1).join("$") : "";
@@ -1194,11 +1196,237 @@ function categoryEmojiSet(cat){
   return CATEGORY_EMOJI_SETS[(cat||"").trim().toLowerCase()] || DEFAULT_EMOJI_SET;
 }
 function categoryEmoji(cat){ return categoryEmojiSet(cat)[0]; }
-function defaultCoverEmoji(p){
-  var cats = getCategories(p);
-  var set = categoryEmojiSet(cats[0]);
-  return set[hashStr(p.id||p.name||"") % set.length];
+/* ---------------- Category artwork ----------------
+   Hand-drawn flat illustrations, three dishes per category, each drawn in a
+   100x100 box centred on (50,50). Eight layouts x palettes per category give
+   eight distinct images; places get them in order within their category so
+   nothing repeats until a category has more than eight places. */
+var ART_MOTIFS = {
+  pizza: [
+    // whole pie
+    '<circle cx="50" cy="50" r="44" fill="#C47F3A"/><circle cx="50" cy="50" r="40.5" fill="#E2A757"/><circle cx="50" cy="50" r="34" fill="#C4402A"/>'+
+    '<path d="M50 17c9 0 14 3 19 8 6 6 10 13 9 22-1 8 3 13-2 21-5 7-12 12-21 13-8 1-14-2-21-6-7-4-11-11-12-20-1-8-3-13 1-20 4-8 10-14 18-17 4-1 6-1 9-1z" fill="#F2C24F"/>'+
+    '<g stroke="#E2A757" stroke-width="1.8" stroke-linecap="round"><path d="M50 50L50 9.5M50 50L85 70M50 50L15 70"/></g>'+
+    '<g fill="#A62F25"><circle cx="38" cy="34" r="6"/><circle cx="63" cy="32" r="5.5"/><circle cx="67" cy="57" r="6"/><circle cx="41" cy="63" r="5.5"/><circle cx="54" cy="47" r="5"/><circle cx="29" cy="51" r="4.5"/></g>'+
+    '<g fill="#C9493B"><circle cx="36.5" cy="32.5" r="1.8"/><circle cx="61.5" cy="30.5" r="1.6"/><circle cx="65.5" cy="55.5" r="1.8"/><circle cx="39.5" cy="61.5" r="1.6"/><circle cx="52.5" cy="45.5" r="1.5"/></g>'+
+    '<g fill="#3F7D3A"><ellipse cx="50" cy="28" rx="4.2" ry="2.2" transform="rotate(-25 50 28)"/><ellipse cx="74" cy="44" rx="4.2" ry="2.2" transform="rotate(35 74 44)"/><ellipse cx="53" cy="70" rx="4.2" ry="2.2" transform="rotate(10 53 70)"/></g>',
+    // slice
+    '<path d="M50 8L85 72Q50 86 15 72Z" fill="#F2C24F"/><path d="M50 8L57 21Q50 24 43 21Z" fill="#E9B043"/>'+
+    '<path d="M13 71Q50 87 87 71L89 79Q50 96 11 79Z" fill="#D18E45"/><g fill="#E6A85C"><circle cx="30" cy="80" r="1.6"/><circle cx="52" cy="85" r="1.6"/><circle cx="72" cy="81" r="1.6"/></g>'+
+    '<g fill="#A62F25"><circle cx="50" cy="34" r="5.5"/><circle cx="38" cy="56" r="6"/><circle cx="62" cy="58" r="6"/><circle cx="50" cy="72" r="4.5"/></g>'+
+    '<g fill="#C9493B"><circle cx="48.5" cy="32.5" r="1.6"/><circle cx="36.5" cy="54.5" r="1.8"/><circle cx="60.5" cy="56.5" r="1.8"/></g>'+
+    '<path d="M76 56c3 1 4 5 3 9-1 4-4 4-5 0z" fill="#F2C24F"/><ellipse cx="45" cy="44" rx="4" ry="2.1" fill="#3F7D3A" transform="rotate(-30 45 44)"/>',
+    // tomato & basil
+    '<ellipse cx="50" cy="58" rx="31" ry="28" fill="#D23F2A"/><ellipse cx="38" cy="48" rx="8" ry="5" fill="#E86A51" transform="rotate(-30 38 48)"/>'+
+    '<path d="M50 32l4-9 2 9 9-3-6 7 8 4-10 1 1 9-6-7-6 7 1-9-10-1 8-4-6-7 9 3 2-9z" fill="#3F7D3A"/>'+
+    '<path d="M82 20c8 6 7 18-2 22-6-6-7-15 2-22z" fill="#4C8B3A"/><path d="M82 22c0 6-1 12-2 19" stroke="#2F6A2B" stroke-width="1" fill="none"/>'
+  ],
+  tacos: [
+    // taco
+    '<g transform="translate(0 7)"><path d="M12 68A38 38 0 0 1 88 68Z" fill="#D9A23E"/>'+
+    '<g fill="#6DB046"><circle cx="14.4" cy="63.0" r="5.2"/><circle cx="16.6" cy="54.5" r="5.2"/><circle cx="20.9" cy="46.8" r="5.2"/><circle cx="26.9" cy="40.4" r="5.2"/><circle cx="34.2" cy="35.6" r="5.2"/><circle cx="42.5" cy="32.8" r="5.2"/><circle cx="51.3" cy="32.0" r="5.2"/><circle cx="59.9" cy="33.4" r="5.2"/><circle cx="68.0" cy="36.8" r="5.2"/><circle cx="75.0" cy="42.1" r="5.2"/><circle cx="80.5" cy="48.9" r="5.2"/><circle cx="84.2" cy="56.9" r="5.2"/></g><path d="M19 68A31 31 0 0 1 81 68" stroke="#8A4A28" stroke-width="7" fill="none"/>'+
+    '<g fill="#D9412C"><circle cx="21.4" cy="51.5" r="3.6"/><circle cx="41.5" cy="36.1" r="3.6"/><circle cx="65.5" cy="38.9" r="3.6"/><circle cx="80.1" cy="54.6" r="3.6"/></g><g fill="#F7F3EA"><circle cx="30.3" cy="42.8" r="2.4"/><circle cx="53.3" cy="36.2" r="2.4"/><circle cx="73.8" cy="46.6" r="2.4"/></g>'+
+    '<path d="M18 74A32 32 0 0 1 82 74Z" fill="#EBB649"/><path d="M25 70A26 26 0 0 1 50 48" stroke="#F4D07A" stroke-width="2.4" fill="none" stroke-linecap="round"/>'+
+    '<g fill="#D19A33"><circle cx="36" cy="62" r="1.6"/><circle cx="52" cy="56" r="1.6"/><circle cx="64" cy="64" r="1.6"/><circle cx="46" cy="68" r="1.4"/><circle cx="72" cy="70" r="1.4"/></g></g>',
+    // avocado half
+    '<path d="M50 10C62 10 70 26 74 42C80 62 72 90 50 90C28 90 20 62 26 42C30 26 38 10 50 10Z" fill="#3E6B2A"/>'+
+    '<path d="M50 15C60 15 66 29 69 43C74 61 67 85 50 85C33 85 26 61 31 43C34 29 40 15 50 15Z" fill="#CFE38A"/>'+
+    '<circle cx="50" cy="60" r="14" fill="#8A5A34"/><ellipse cx="45" cy="55" rx="4" ry="3" fill="#A87449"/>',
+    // lime wedge
+    '<path d="M14 46A36 36 0 0 0 86 46Z" fill="#4E9A2E"/><path d="M19 46A31 31 0 0 0 81 46Z" fill="#EAF3C7"/><path d="M22 46A28 28 0 0 0 78 46Z" fill="#B9DB68"/>'+
+    '<g stroke="#EAF3C7" stroke-width="1.6" stroke-linecap="round"><path d="M50 47L50 73M50 47L31 66M50 47L69 66M50 47L24 54M50 47L76 54"/></g><rect x="13" y="44" width="74" height="3" rx="1.5" fill="#EAF3C7"/>'
+  ],
+  thai: [
+    // noodle bowl
+    '<path d="M18 50Q24 28 50 26Q76 28 82 50Z" fill="#F0CF7A"/>'+
+    '<g stroke="#D9AE52" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M24 46q6-8 12-2t12-2t12-2t12 2"/><path d="M28 38q6-6 11-1t11-2t11 1"/><path d="M36 31q5-4 10-1t10 0"/></g>'+
+    '<path d="M54 30c8-6 18-2 17 6-1 5-7 6-9 2 4 1 5-3 2-5-3-2-7 0-10 0z" fill="#F08A5D"/><g fill="#B0612E"><circle cx="38" cy="36" r="1.5"/><circle cx="44" cy="40" r="1.3"/><circle cx="62" cy="44" r="1.5"/></g><g fill="#D23F2A"><circle cx="33" cy="42" r="1"/><circle cx="57" cy="38" r="1"/></g>'+
+    '<g stroke="#8B5A2B" stroke-width="3.2" stroke-linecap="round"><path d="M60 38L94 10"/><path d="M64 41L97 16"/></g>'+
+    '<path d="M12 48A38 38 0 0 0 88 48Z" fill="#2E6E8E"/><path d="M12 48h76" stroke="#3E86AA" stroke-width="4" stroke-linecap="round"/>'+
+    '<path d="M22 64q7-5 14 0t14 0t14 0t14 0" stroke="#F5EFE3" stroke-width="1.8" fill="none" stroke-linecap="round"/>',
+    // chili pair
+    '<path d="M34 24C22 44 30 76 66 86C56 74 46 56 44 30Z" fill="#C8302A"/><path d="M38 34C35 50 40 68 56 80" stroke="#E5604B" stroke-width="2" fill="none" stroke-linecap="round"/>'+
+    '<path d="M34 24c-3-7 2-13 9-12l1 5c-5-1-6 3-4 7z" fill="#4C8B3A"/><path d="M33 26c2 3 8 4 11 3" stroke="#4C8B3A" stroke-width="3" stroke-linecap="round" fill="none"/>'+
+    '<path d="M60 18C76 32 80 60 72 78C70 66 62 46 54 26Z" fill="#E0553A"/><path d="M60 18c1-7 8-10 13-6l-3 4c-3-3-7-1-7 3z" fill="#5A9A40"/>',
+    // lime half (top view)
+    '<circle cx="50" cy="50" r="38" fill="#4E9A2E"/><circle cx="50" cy="50" r="34" fill="#EAF3C7"/><circle cx="50" cy="50" r="31" fill="#B9DB68"/>'+
+    '<g stroke="#EAF3C7" stroke-width="2" stroke-linecap="round"><path d="M50 50L50 20M50 50L71 29M50 50L80 50M50 50L71 71M50 50L50 80M50 50L29 71M50 50L20 50M50 50L29 29"/></g><circle cx="50" cy="50" r="3.5" fill="#EAF3C7"/>'
+  ],
+  sushi: [
+    // nigiri
+    '<rect x="18" y="50" width="64" height="26" rx="13" fill="#F7F3EA"/><g fill="#E4DCCB"><ellipse cx="30" cy="66" rx="2.5" ry="1.4"/><ellipse cx="44" cy="70" rx="2.5" ry="1.4"/><ellipse cx="58" cy="67" rx="2.5" ry="1.4"/><ellipse cx="70" cy="70" rx="2.5" ry="1.4"/></g>'+
+    '<path d="M14 54Q18 32 50 34Q84 32 88 52Q86 62 70 59Q50 56 30 62Q14 64 14 54Z" fill="#F08A5D"/>'+
+    '<g stroke="#FAD2BE" stroke-width="2.2" fill="none" stroke-linecap="round"><path d="M28 40q6 8 2 18"/><path d="M42 36q6 9 2 20"/><path d="M57 36q6 9 2 19"/><path d="M71 38q5 8 2 17"/></g>',
+    // maki (top view)
+    '<circle cx="50" cy="50" r="38" fill="#1F2B24"/><circle cx="50" cy="50" r="32" fill="#F7F3EA"/>'+
+    '<g fill="#E4DCCB"><ellipse cx="34" cy="38" rx="2.6" ry="1.4" transform="rotate(30 34 38)"/><ellipse cx="66" cy="38" rx="2.6" ry="1.4" transform="rotate(-30 66 38)"/><ellipse cx="34" cy="64" rx="2.6" ry="1.4"/><ellipse cx="64" cy="66" rx="2.6" ry="1.4" transform="rotate(20 64 66)"/><ellipse cx="50" cy="28" rx="2.6" ry="1.4"/><ellipse cx="50" cy="73" rx="2.6" ry="1.4"/></g>'+
+    '<rect x="38" y="40" width="16" height="16" rx="3" fill="#F08A5D"/><rect x="52" y="46" width="11" height="12" rx="2.5" fill="#7DB84F"/><rect x="42" y="54" width="10" height="8" rx="2" fill="#CFE38A"/>',
+    // chopsticks & soy dish
+    '<ellipse cx="44" cy="66" rx="30" ry="12" fill="#F7F3EA"/><ellipse cx="44" cy="64" rx="22" ry="7.5" fill="#4A2C1E"/><ellipse cx="38" cy="62" rx="6" ry="2" fill="#6A4330"/>'+
+    '<path d="M66 60c4-3 9-1 8 3s-7 4-9 1z" fill="#8CC152"/>'+
+    '<g stroke="#A0522D" stroke-width="3.6" stroke-linecap="round"><path d="M14 40L92 20"/><path d="M16 47L94 28"/></g>'
+  ],
+  indian: [
+    // curry bowl
+    '<ellipse cx="13" cy="50" rx="6" ry="4" fill="#8E4A1C"/><ellipse cx="87" cy="50" rx="6" ry="4" fill="#8E4A1C"/>'+
+    '<path d="M14 48A36 32 0 0 0 86 48Z" fill="#B5652A"/><path d="M20 60Q50 70 80 60" stroke="#CF7E3E" stroke-width="2" fill="none" stroke-linecap="round"/>'+
+    '<ellipse cx="50" cy="48" rx="36" ry="9" fill="#E07B22"/><g fill="#C25E17"><circle cx="34" cy="48" r="3.4"/><circle cx="58" cy="45" r="3"/><circle cx="66" cy="50" r="3.4"/></g>'+
+    '<path d="M38 47q8-6 16 0t12 0" stroke="#F7E6C9" stroke-width="2.4" fill="none" stroke-linecap="round"/><g fill="#4C8B3A"><circle cx="46" cy="44" r="2"/><circle cx="50" cy="51" r="1.8"/><circle cx="72" cy="46" r="1.8"/></g>',
+    // naan
+    '<path d="M8 58C10 40 34 28 62 30C82 31 94 42 92 56C90 70 72 78 46 76C24 75 7 70 8 58Z" fill="#EAC27E"/><path d="M14 56C18 44 36 36 58 37" stroke="#F3D9A3" stroke-width="5" fill="none" stroke-linecap="round"/>'+
+    '<g fill="#A86A30"><ellipse cx="30" cy="62" rx="5" ry="3" transform="rotate(-10 30 62)"/><ellipse cx="56" cy="50" rx="4.5" ry="2.6"/><ellipse cx="72" cy="62" rx="5" ry="3" transform="rotate(12 72 62)"/><ellipse cx="46" cy="68" rx="3" ry="2"/><ellipse cx="80" cy="46" rx="3" ry="2"/></g>'+
+    '<g fill="#6E4120"><circle cx="40" cy="52" r="1.6"/><circle cx="64" cy="40" r="1.4"/><circle cx="22" cy="54" r="1.3"/><circle cx="60" cy="68" r="1.4"/></g><g fill="#4C8B3A"><circle cx="36" cy="44" r="1.4"/><circle cx="50" cy="60" r="1.3"/><circle cx="76" cy="54" r="1.3"/></g>',
+    // samosa
+    '<path d="M50 14L86 78Q50 88 14 78Z" fill="#E2A84B"/><path d="M50 14L50 82" stroke="#C88B34" stroke-width="2" stroke-linecap="round"/>'+
+    '<path d="M14 78Q50 88 86 78" stroke="#C88B34" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="1 4"/><g fill="#F0C77A"><ellipse cx="38" cy="54" rx="5" ry="3"/><ellipse cx="62" cy="58" rx="4" ry="2.5"/></g><g fill="#B97C3D"><circle cx="34" cy="66" r="1.2"/><circle cx="66" cy="70" r="1.2"/><circle cx="56" cy="40" r="1.2"/></g>'
+  ],
+  burgers: [
+    // burger
+    '<rect x="16" y="72" width="68" height="13" rx="6.5" fill="#D99A45"/><rect x="14" y="60" width="72" height="13" rx="6" fill="#6B3A22"/>'+
+    '<path d="M14 58h72l-6 8-6-5-7 9-7-8-7 7-8-8-7 6-6-6-7 6z" fill="#F2C14E"/><path d="M12 56q5-6 10 0t10 0t10 0t10 0t10 0t10 0t10 0l2 4H12z" fill="#6DB046"/>'+
+    '<rect x="22" y="50" width="22" height="6" rx="3" fill="#D9412C"/><rect x="50" y="50" width="26" height="6" rx="3" fill="#D9412C"/>'+
+    '<path d="M16 50Q16 16 50 16Q84 16 84 50Z" fill="#E2A24F"/><path d="M24 34Q30 22 44 20" stroke="#F0C27E" stroke-width="3" fill="none" stroke-linecap="round"/>'+
+    '<g fill="#F7E6C1"><ellipse cx="40" cy="30" rx="2.4" ry="1.3" transform="rotate(-20 40 30)"/><ellipse cx="55" cy="26" rx="2.4" ry="1.3" transform="rotate(15 55 26)"/><ellipse cx="66" cy="36" rx="2.4" ry="1.3" transform="rotate(-10 66 36)"/><ellipse cx="48" cy="40" rx="2.4" ry="1.3" transform="rotate(25 48 40)"/><ellipse cx="30" cy="42" rx="2.4" ry="1.3"/></g>',
+    // fries
+    '<g fill="#F2C14E"><rect x="30" y="16" width="7" height="40" rx="2"/><rect x="39" y="10" width="7" height="44" rx="2"/><rect x="48" y="14" width="7" height="40" rx="2"/><rect x="57" y="9" width="7" height="44" rx="2"/><rect x="65" y="18" width="7" height="38" rx="2"/></g>'+
+    '<g fill="#E0A93A"><rect x="34" y="20" width="7" height="34" rx="2" transform="rotate(-8 37 37)"/><rect x="61" y="16" width="7" height="38" rx="2" transform="rotate(8 64 35)"/></g>'+
+    '<path d="M26 40Q50 48 74 40L68 90H32Z" fill="#C8302A"/><path d="M26 40Q50 48 74 40L73 46Q50 54 27 46Z" fill="#A82820"/><circle cx="50" cy="68" r="9" fill="#F7F3EA"/><path d="M45 68l3 3 6-7" stroke="#C8302A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    // soda cup
+    '<rect x="55" y="4" width="5" height="28" rx="2.5" fill="#F7F3EA" transform="rotate(14 57 18)"/><g fill="#C8302A"><rect x="55" y="8" width="5" height="4" transform="rotate(14 57 18)"/><rect x="55" y="17" width="5" height="4" transform="rotate(14 57 18)"/></g>'+
+    '<path d="M30 30H70L64 90H36Z" fill="#2E6E8E"/><rect x="26" y="24" width="48" height="9" rx="4" fill="#E8E1D3"/><path d="M33 56q9-7 17 0t17 0" stroke="#F7F3EA" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M36 38l3 44" stroke="#3E86AA" stroke-width="3" stroke-linecap="round"/>'
+  ],
+  icecream: [
+    // cone with two scoops
+    '<path d="M33 52L67 52L50 94Z" fill="#D9A05B"/><g stroke="#B9803F" stroke-width="1.4"><path d="M38 56L58 82M48 54L64 66M36 60L46 74M62 56L42 82M52 54L36 66M64 60L54 74"/></g>'+
+    '<circle cx="50" cy="26" r="14" fill="#9ED9C5"/><g fill="#5A3A26"><rect x="41" y="20" width="3.4" height="2" rx="1" transform="rotate(30 42 21)"/><rect x="55" y="17" width="3.4" height="2" rx="1" transform="rotate(-20 56 18)"/><rect x="58" y="27" width="3.4" height="2" rx="1" transform="rotate(50 59 28)"/><rect x="38" y="29" width="3.4" height="2" rx="1" transform="rotate(-40 39 30)"/><rect x="49" y="15" width="3.4" height="2" rx="1" transform="rotate(10 50 16)"/></g>'+
+    '<circle cx="50" cy="42" r="17" fill="#F4A6B8"/><path d="M33 46q4 8 8 1 4 9 8 0 4 8 8 0 4 7 8-1 2-1 2-6z" fill="#F4A6B8"/><ellipse cx="43" cy="37" rx="5" ry="3" fill="#F8C6D2" transform="rotate(-30 43 37)"/>',
+    // popsicle
+    '<rect x="45" y="66" width="10" height="26" rx="5" fill="#E3C08D"/><rect x="30" y="10" width="40" height="62" rx="20" fill="#F28C6B"/><path d="M30 42h40v10a20 20 0 0 1-40 0z" fill="#F7B5A0"/>'+
+    '<path d="M70 30c-6 2-6 8-1 10" fill="#F28C6B" stroke="#F28C6B"/><rect x="36" y="18" width="5" height="22" rx="2.5" fill="#F7B5A0"/><path d="M38 72q2 6 4 0" fill="#F7B5A0"/>',
+    // sundae
+    '<path d="M44 76h12v8H44z" fill="#E8E1D3"/><ellipse cx="50" cy="88" rx="18" ry="4" fill="#E8E1D3"/><path d="M20 52H80L66 78H34Z" fill="#E8F1F3"/>'+
+    '<circle cx="36" cy="48" r="11" fill="#F4A6B8"/><circle cx="64" cy="48" r="11" fill="#F3E3B3"/><circle cx="50" cy="42" r="13" fill="#8A5A3C"/>'+
+    '<path d="M40 34q4-8 10-4q6-6 10 2q-4 4-10 3-6 2-10-1z" fill="#FBF6EC"/><circle cx="51" cy="24" r="5.5" fill="#C8302A"/><path d="M52 19q2-7 8-9" stroke="#4C8B3A" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="49" cy="22.5" r="1.5" fill="#E5604B"/>'
+  ],
+  bars: [
+    // martini
+    '<path d="M18 22H82L50 56Z" fill="#DCEFF3"/><path d="M26 30H74L50 54Z" fill="#BFE1E8"/><path d="M50 56V84" stroke="#DCEFF3" stroke-width="3.4" stroke-linecap="round"/><ellipse cx="50" cy="86" rx="16" ry="3.5" fill="#DCEFF3"/>'+
+    '<path d="M62 12L44 40" stroke="#8B5A2B" stroke-width="1.6" stroke-linecap="round"/><circle cx="52" cy="28" r="6.5" fill="#6B8E23"/><circle cx="52.5" cy="27.5" r="2.4" fill="#C8302A"/>',
+    // beer mug
+    '<path d="M66 40h8a10 10 0 0 1 10 10v14a10 10 0 0 1-10 10h-8" stroke="#E8E1D3" stroke-width="6" fill="none"/><rect x="22" y="30" width="46" height="58" rx="7" fill="#F2B53C"/>'+
+    '<rect x="28" y="38" width="6" height="42" rx="3" fill="#F7CD6E"/><g fill="#E5A02A"><circle cx="46" cy="56" r="1.6"/><circle cx="54" cy="68" r="1.4"/><circle cx="44" cy="74" r="1.2"/></g>'+
+    '<g fill="#FBF6EC"><circle cx="28" cy="30" r="9"/><circle cx="40" cy="25" r="10"/><circle cx="53" cy="27" r="9"/><circle cx="63" cy="31" r="8"/><rect x="22" y="28" width="46" height="8"/></g>',
+    // red wine
+    '<path d="M30 14Q28 56 50 58Q72 56 70 14Z" fill="#F1ECE6"/><path d="M30.6 34Q32 56 50 58Q68 56 69.4 34Z" fill="#8E1F3A"/><path d="M36 20Q34 36 38 46" stroke="#FFFFFF" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".7"/>'+
+    '<path d="M50 58V84" stroke="#F1ECE6" stroke-width="3.4" stroke-linecap="round"/><ellipse cx="50" cy="86" rx="16" ry="3.5" fill="#F1ECE6"/>'
+  ],
+  coffee: [
+    // cup & saucer
+    '<g stroke="#FBF6EC" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".85"><path d="M40 28q-5-6 0-12t0-12"/><path d="M52 28q-5-6 0-12t0-12"/></g>'+
+    '<ellipse cx="50" cy="82" rx="38" ry="8" fill="#E8E1D3"/><path d="M74 46h4a9 9 0 0 1 0 18h-6" stroke="#F7F3EA" stroke-width="5" fill="none"/>'+
+    '<path d="M24 38H76Q74 80 50 80Q26 80 24 38Z" fill="#F7F3EA"/><ellipse cx="50" cy="38" rx="26" ry="6" fill="#6B3A22"/><path d="M50 42c-6-4-6-8-2-8 1 0 2 1 2 2 0-1 1-2 2-2 4 0 4 4-2 8z" fill="#E3C08D"/>',
+    // beans
+    '<g transform="rotate(-25 36 50)"><ellipse cx="36" cy="50" rx="16" ry="23" fill="#6B3A22"/><path d="M36 28q-8 22 0 44" stroke="#3E2116" stroke-width="3" fill="none" stroke-linecap="round"/></g>'+
+    '<g transform="rotate(20 66 54)"><ellipse cx="66" cy="54" rx="14" ry="20" fill="#7E4A2E"/><path d="M66 35q-7 19 0 38" stroke="#3E2116" stroke-width="2.6" fill="none" stroke-linecap="round"/></g>',
+    // croissant
+    '<g fill="#E3A44C"><ellipse cx="50" cy="44" rx="13" ry="20"/></g><g fill="#D99039"><ellipse cx="33" cy="52" rx="10" ry="15" transform="rotate(-40 33 52)"/><ellipse cx="67" cy="52" rx="10" ry="15" transform="rotate(40 67 52)"/></g>'+
+    '<g fill="#C77F2C"><ellipse cx="20" cy="64" rx="7" ry="10" transform="rotate(-60 20 64)"/><ellipse cx="80" cy="64" rx="7" ry="10" transform="rotate(60 80 64)"/></g>'+
+    '<g stroke="#B56E22" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M42 30q8 6 16 0M40 46q10 6 20 0M28 46q4 8 2 16M72 46q-4 8-2 16"/></g><ellipse cx="46" cy="36" rx="4" ry="6" fill="#F0C27E"/>'
+  ],
+  vietnamese: [
+    // pho bowl
+    '<g stroke="#8B5A2B" stroke-width="3.2" stroke-linecap="round"><path d="M58 40L92 12"/><path d="M62 43L95 18"/></g>'+
+    '<path d="M12 46A38 38 0 0 0 88 46Z" fill="#F7F3EA"/><path d="M15 54Q50 62 85 54" stroke="#2E6E8E" stroke-width="2.4" fill="none"/><ellipse cx="50" cy="46" rx="38" ry="9" fill="#C98B4A"/>'+
+    '<g stroke="#FBF6EC" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M24 46q6-4 12 0t12 0"/><path d="M50 44q6-4 12 0t12 0"/></g><g fill="#A9675A"><ellipse cx="36" cy="44" rx="7" ry="3"/><ellipse cx="62" cy="48" rx="7" ry="3"/></g><g fill="#4C8B3A"><circle cx="48" cy="42" r="2.2"/><circle cx="54" cy="47" r="1.8"/><circle cx="72" cy="44" r="2"/><circle cx="28" cy="48" r="1.8"/></g><path d="M66 38l8 6" stroke="#B9DB68" stroke-width="3" stroke-linecap="round"/>',
+    // banh mi
+    '<g transform="rotate(-18 50 50)"><path d="M10 50Q12 34 50 33Q88 34 90 50Q88 58 50 58Q12 58 10 50Z" fill="#E1A54F"/><path d="M14 49Q50 56 86 49L86 52Q50 60 14 52Z" fill="#6DB046"/><path d="M18 52Q50 60 82 52" stroke="#F08A3A" stroke-width="2.4" fill="none"/><path d="M12 54Q14 66 50 67Q86 66 88 54Q50 62 12 54Z" fill="#D9973F"/>'+
+    '<g stroke="#F0C27E" stroke-width="2.4" stroke-linecap="round"><path d="M28 38l6 6M44 36l6 6M60 36l6 6"/></g></g>',
+    // fresh rolls
+    '<g transform="rotate(-12 50 50)"><rect x="10" y="22" width="66" height="26" rx="13" fill="#F3EBDB"/><g fill="#F4A08A"><path d="M24 30q6-5 12 0q-6 4-12 0z"/><path d="M44 29q6-5 12 0q-6 4-12 0z"/></g><path d="M18 40q20-4 50 0" stroke="#7DB84F" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="10" y="22" width="66" height="26" rx="13" fill="#FBF6EC" opacity=".35"/></g>'+
+    '<g transform="rotate(-12 50 50)"><rect x="22" y="52" width="66" height="26" rx="13" fill="#F3EBDB"/><g fill="#F4A08A"><path d="M36 60q6-5 12 0q-6 4-12 0z"/><path d="M58 59q6-5 12 0q-6 4-12 0z"/></g><path d="M30 70q20-4 50 0" stroke="#7DB84F" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="22" y="52" width="66" height="26" rx="13" fill="#FBF6EC" opacity=".35"/></g>'
+  ],
+  generic: [
+    // plate & cutlery
+    '<circle cx="50" cy="50" r="30" fill="#F7F3EA"/><circle cx="50" cy="50" r="22" fill="none" stroke="#E4DCCB" stroke-width="2"/>'+
+    '<g fill="#B7AEA2"><rect x="10" y="40" width="3.4" height="44" rx="1.7"/><rect x="6" y="18" width="2" height="18" rx="1"/><rect x="10" y="18" width="2" height="18" rx="1"/><rect x="14" y="18" width="2" height="18" rx="1"/><path d="M6 34h10v4a5 5 0 0 1-10 0z"/>'+
+    '<path d="M86 16c6 4 6 20 3 28v40a2 2 0 0 1-4 0V18c0-2 0-2 1-2z"/></g>',
+    // cloche
+    '<rect x="12" y="74" width="76" height="5" rx="2.5" fill="#C9C2B8"/><path d="M18 74A32 32 0 0 1 82 74Z" fill="#DCD7CF"/><path d="M28 60Q34 48 46 44" stroke="#F4F1EC" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="50" cy="38" r="4.5" fill="#C9C2B8"/>',
+    // steaming bowl
+    '<g stroke="#FBF6EC" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".85"><path d="M38 34q-5-6 0-12t0-12"/><path d="M50 34q-5-6 0-12t0-12"/><path d="M62 34q-5-6 0-12t0-12"/></g>'+
+    '<path d="M14 48A36 36 0 0 0 86 48Z" fill="#D9603F"/><path d="M14 48h72" stroke="#E57A5C" stroke-width="4" stroke-linecap="round"/><path d="M24 62q7-5 14 0t14 0t14 0t14 0" stroke="#F7E6C9" stroke-width="2" fill="none" stroke-linecap="round"/>'
+  ]
+};
+var ART_PALETTES = [
+  { bg:"#F3EAD8", accent:"#E8D9BA" },  // cream
+  { bg:"#D9E7DA", accent:"#C3D9C6" },  // sage
+  { bg:"#EFCDB7", accent:"#E6B99D" },  // terracotta
+  { bg:"#F5E3AA", accent:"#EDD48C" },  // butter
+  { bg:"#2F5E4E", accent:"#3A6E5C" },  // forest
+  { bg:"#2B3D4F", accent:"#354B60" },  // navy
+  { bg:"#F2D5D3", accent:"#EAC1BE" },  // blush
+  { bg:"#9A3B2B", accent:"#AA4A38" }   // chili
+];
+function artCategoryKey(cat){
+  var c = String(cat||"").toLowerCase();
+  if(/pizza|italian|pasta|trattoria/.test(c)) return "pizza";
+  if(/taco|mexican|burrito|taqueria|latin|tex-?mex/.test(c)) return "tacos";
+  if(/vietnam|pho|banh/.test(c)) return "vietnamese";
+  if(/thai|noodle|ramen|chinese|asian|korean|dumpling/.test(c)) return "thai";
+  if(/sushi|japanese|izakaya|poke/.test(c)) return "sushi";
+  if(/indian|curry|nepal|pakistan/.test(c)) return "indian";
+  if(/burger|diner|fast food|hot dog/.test(c)) return "burgers";
+  if(/ice cream|gelato|dessert|frozen|sweet/.test(c)) return "icecream";
+  if(/coffee|caf[eé]|espresso|bakery|brunch|breakfast|\btea\b/.test(c)) return "coffee";
+  if(/bar\b|bars|drink|cocktail|wine|beer|brew|pub|tavern/.test(c)) return "bars";
+  return "generic";
 }
+function artPlace(m, cx, cy, s, rot){
+  return '<g transform="translate('+cx+' '+cy+') rotate('+(rot||0)+') scale('+s+') translate(-50 -50)">'+m+'</g>';
+}
+// layout 0-7 -> SVG (160x100 canvas; a square crop shows its centre)
+function artSvg(key, variant){
+  var M = ART_MOTIFS[key] || ART_MOTIFS.generic;
+  var v = ((variant%8)+8)%8;
+  var catIdx = Object.keys(ART_MOTIFS).indexOf(key);
+  var pal = ART_PALETTES[(v*3 + catIdx) % ART_PALETTES.length];
+  var shadow = function(cx, cy, w){ return '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+w+'" ry="'+(w*0.16)+'" fill="#000" opacity=".1"/>'; };
+  var body = '<rect width="160" height="100" fill="'+pal.bg+'"/>';
+  switch(v){
+    case 0: body += '<circle cx="80" cy="50" r="40" fill="'+pal.accent+'"/>'+shadow(80,88,26)+artPlace(M[0],80,50,0.8,0); break;
+    case 1: body += '<path d="M0 72Q40 58 80 70T160 66V100H0Z" fill="'+pal.accent+'"/>'+shadow(80,88,24)+artPlace(M[1],80,50,0.78,-6); break;
+    case 2: body += '<rect x="44" y="14" width="72" height="72" rx="18" fill="'+pal.accent+'" transform="rotate(8 80 50)"/>'+artPlace(M[2],80,50,0.74,4); break;
+    case 3: // pattern
+      var cells = '';
+      for(var r=0;r<4;r++) for(var c=0;c<6;c++){
+        var x = c*32 + (r%2?16:0), y = r*32 + 4;
+        cells += artPlace(M[(r+c)%3], x, y, 0.27, ((r*7+c)%5-2)*9);
+      }
+      body += cells; break;
+    case 4: body += '<circle cx="80" cy="50" r="46" fill="'+pal.accent+'"/><circle cx="80" cy="50" r="34" fill="'+pal.bg+'" opacity=".55"/>'+artPlace(M[0],80,52,0.66,-10); break;
+    case 5: body += '<circle cx="64" cy="50" r="30" fill="'+pal.accent+'"/>'+artPlace(M[1],64,54,0.58,-12)+artPlace(M[0],98,48,0.62,8); break;
+    case 6: body += artPlace(M[0],92,64,1.35,-14); break;
+    case 7: body += '<rect y="70" width="160" height="30" fill="'+pal.accent+'"/>'+artPlace(M[1],48,52,0.4,-6)+artPlace(M[0],80,48,0.48,0)+artPlace(M[2],112,52,0.4,6); break;
+  }
+  return '<svg class="art" viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">'+body+'</svg>';
+}
+// Cover art: places in the same art family are numbered in the order they were added, so the first eight each get a different drawing.
+var _artOrder = { places:null, map:{} };
+function placeArtKey(p){ return artCategoryKey(getCategories(p)[0]); }
+function placeArtVariant(p){
+  if(_artOrder.places !== S.places){
+    var groups = {}, map = {};
+    (S.places||[]).forEach(function(x){ var k = placeArtKey(x); (groups[k] = groups[k] || []).push(x); });
+    Object.keys(groups).forEach(function(k){
+      groups[k].sort(function(a,b){ return (a.createdAt||"").localeCompare(b.createdAt||"") || String(a.id).localeCompare(String(b.id)); })
+        .forEach(function(x, i){ map[x.id] = i; });
+    });
+    _artOrder = { places:S.places, map:map };
+  }
+  var v = _artOrder.map[p.id];
+  return v == null ? hashStr(p.id||p.name||"") : v;
+}
+function placeArt(p){ return artSvg(placeArtKey(p), placeArtVariant(p)); }
 function categoryRank(name){
   var idx = (S.space.categories||[]).indexOf(name);
   return idx===-1 ? 9999 : idx;
@@ -2298,7 +2526,7 @@ function placeViewHtml(p){
   if(cover){
     html += '<img class="hero" src="'+escapeHtml(cover)+'" alt="">';
   } else {
-    html += '<div class="hero-emoji" aria-hidden="true">'+defaultCoverEmoji(p)+'</div>';
+    html += '<div class="hero-art" aria-hidden="true">'+placeArt(p)+'</div>';
   }
   html += '<div class="view-title-row">'+
     '<h2 class="display view-title">'+escapeHtml(p.name||"Untitled")+'</h2>'+
